@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { LevelMeter } from '@/components/LevelMeter'
 import { Volume2, Plus, Mic, Scissors, Keyboard } from 'lucide-react'
+import { noteNumberToName } from '@/utils/midiUtils'
 import { cn } from '@/lib/utils'
 import { ACCEPTED_AUDIO_FORMATS, MAX_SOUND_FILE_SIZE_BYTES } from '@/constants'
 
@@ -11,6 +12,7 @@ export function SoundCell({
   index,
   isPlaying,
   keybindings = [],
+  midiBindings = [],
   level = 0,
   onPlay,
   onUpload,
@@ -106,7 +108,7 @@ export function SoundCell({
                   e.stopPropagation()
                   onSetKeybind?.(index)
                 }}
-                title="Set keybinding"
+                title="Set binding"
               >
                 <Keyboard className="size-3" />
               </Button>
@@ -123,20 +125,32 @@ export function SoundCell({
               </Button>
             </div>
             <div className="text-xs text-muted-foreground flex flex-wrap gap-1">
-              {keybindings.length > 0 ? (
-                keybindings.map((k) => (
-                  <kbd
-                    key={k}
-                    className="px-1 py-0.5 bg-muted rounded text-[10px] cursor-pointer hover:bg-muted/80"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onSetKeybind?.(index)
-                    }}
-                  >
-                    {k}
-                  </kbd>
-                ))
-              ) : (
+              {keybindings.map((k) => (
+                <kbd
+                  key={k}
+                  className="px-1 py-0.5 bg-muted rounded text-[10px] cursor-pointer hover:bg-muted/80"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onSetKeybind?.(index)
+                  }}
+                >
+                  {k}
+                </kbd>
+              ))}
+              {midiBindings.map((b) => (
+                <span
+                  key={`${b.note}-${b.channel}`}
+                  className="px-1 py-0.5 bg-muted rounded text-[10px] cursor-pointer hover:bg-muted/80"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onSetKeybind?.(index)
+                  }}
+                  title="MIDI note"
+                >
+                  {noteNumberToName(b.note)}
+                </span>
+              ))}
+              {keybindings.length === 0 && midiBindings.length === 0 && (
                 <button
                   type="button"
                   className="text-muted-foreground hover:text-foreground transition-colors"

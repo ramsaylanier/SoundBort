@@ -1,11 +1,16 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { DEFAULT_GRID_SIZE } from '@/constants'
+import { DEFAULT_GRID_SIZE, getStoredGridSize } from '@/constants'
 
-export function createEmptySoundboard(name = 'New Soundboard') {
+export function createEmptySoundboard(name = 'New Soundboard', gridSize) {
+  const size =
+    gridSize ?? (() => {
+      const { rows, cols } = getStoredGridSize()
+      return rows * cols
+    })()
   return {
     id: crypto.randomUUID(),
     name,
-    sounds: Array.from({ length: DEFAULT_GRID_SIZE }, () => null),
+    sounds: Array.from({ length: size }, () => null),
     mixer: { mic: 1, soundboard: 1, master: 1 },
   }
 }
@@ -71,10 +76,13 @@ export function useSoundboard(audioContext, soundboardGainRef) {
     [audioContext, soundboardGainRef, getOrCreateGainNode]
   )
 
-  const setSoundVolume = useCallback((soundId, volume) => {
-    const gain = gainNodesRef.current.get(soundId)
-    if (gain) gain.gain.value = volume
-  }, [])
+  const setSoundVolume = useCallback(
+    (soundId, volume) => {
+      const gain = getOrCreateGainNode(soundId)
+      if (gain) gain.gain.value = volume
+    },
+    [getOrCreateGainNode]
+  )
 
   const updateSound = useCallback((index, sound) => {
     setSoundboard((prev) => {

@@ -1,14 +1,33 @@
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible'
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet'
 import { Slider } from '@/components/ui/slider'
 import { Button } from '@/components/ui/button'
 import { LevelMeter } from '@/components/LevelMeter'
-import { ChevronDown, ChevronUp } from 'lucide-react'
-import { useState } from 'react'
+import { SlidersHorizontal } from 'lucide-react'
 import { useAudioLevel } from '@/hooks/useAudioLevel'
+
+const BusRow = ({ label, level, value, onValueChange }) => {
+
+  const toSlider = (v) => Math.round((v ?? 1) * 100)
+  const fromSlider = (v) => (v ?? 100) / 100
+  return (<div className="flex items-center gap-3">
+    <label className="text-sm font-medium w-24 shrink-0">{label}</label>
+    <LevelMeter level={level} orientation="horizontal" />
+    <Slider
+      value={[toSlider(value)]}
+      onValueChange={([v]) => onValueChange(fromSlider(v))}
+      min={0}
+      max={100}
+      step={1}
+      className="flex-1"
+    />
+  </div>)
+}
 
 export function Mixer({
   mixerLevels,
@@ -21,7 +40,6 @@ export function Mixer({
   analyserMasterRef,
   levelBySoundId = {},
 }) {
-  const [open, setOpen] = useState(false)
   const micLevel = useAudioLevel(analyserMicRef)
   const soundboardLevel = useAudioLevel(analyserSoundboardRef)
   const masterLevel = useAudioLevel(analyserMasterRef)
@@ -29,30 +47,19 @@ export function Mixer({
   const toSlider = (v) => Math.round((v ?? 1) * 100)
   const fromSlider = (v) => (v ?? 100) / 100
 
-  const BusRow = ({ label, level, value, onValueChange }) => (
-    <div className="flex items-center gap-3">
-      <label className="text-sm font-medium w-24 shrink-0">{label}</label>
-      <LevelMeter level={level} orientation="horizontal" />
-      <Slider
-        value={[toSlider(value)]}
-        onValueChange={([v]) => onValueChange(fromSlider(v))}
-        min={0}
-        max={100}
-        className="flex-1"
-      />
-    </div>
-  )
-
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger asChild>
+    <Sheet>
+      <SheetTrigger asChild>
         <Button variant="outline" size="sm" className="gap-2">
-          {open ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+          <SlidersHorizontal className="size-4" />
           Mixer
         </Button>
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className="mt-4 p-4 rounded-lg border bg-card space-y-6 max-w-md">
+      </SheetTrigger>
+      <SheetContent side="right" className="sm:max-w-md overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>Mixer</SheetTitle>
+        </SheetHeader>
+        <div className="flex flex-col gap-6 p-4 pt-0">
           <div className="space-y-4">
             <BusRow
               label="Mic"
@@ -64,7 +71,9 @@ export function Mixer({
               label="Soundboard"
               level={soundboardLevel}
               value={mixerLevels.soundboard}
-              onValueChange={(v) => setMixerLevels((prev) => ({ ...prev, soundboard: v }))}
+              onValueChange={(v) =>
+                setMixerLevels((prev) => ({ ...prev, soundboard: v }))
+              }
             />
             <BusRow
               label="Master"
@@ -75,14 +84,19 @@ export function Mixer({
           </div>
           {sounds?.filter(Boolean).length > 0 && (
             <div>
-              <label className="text-sm font-medium block mb-2">Per-sound volume</label>
+              <label className="text-sm font-medium block mb-2">
+                Per-sound volume
+              </label>
               <div className="space-y-3">
                 {sounds
                   .filter(Boolean)
                   .map((s) => (
                     <div key={s.id} className="flex items-center gap-3">
                       <span className="text-sm truncate w-24">{s.name}</span>
-                      <LevelMeter level={levelBySoundId[s.id] ?? 0} orientation="horizontal" />
+                      <LevelMeter
+                        level={levelBySoundId[s.id] ?? 0}
+                        orientation="horizontal"
+                      />
                       <Slider
                         value={[toSlider(s.volume ?? 1)]}
                         onValueChange={([v]) => {
@@ -92,6 +106,7 @@ export function Mixer({
                         }}
                         min={0}
                         max={100}
+                        step={1}
                         className="flex-1"
                       />
                     </div>
@@ -100,7 +115,7 @@ export function Mixer({
             </div>
           )}
         </div>
-      </CollapsibleContent>
-    </Collapsible>
+      </SheetContent>
+    </Sheet>
   )
 }
