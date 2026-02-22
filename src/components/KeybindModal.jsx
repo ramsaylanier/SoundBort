@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { keybindToString } from '@/utils/keybindUtils'
+import { keybindToString, isModifierKey, keybindPartCount } from '@/utils/keybindUtils'
 import { X } from 'lucide-react'
 
 export function KeybindModal({
@@ -23,7 +23,13 @@ export function KeybindModal({
     (e) => {
       e.preventDefault()
       if (['Tab', 'Escape'].includes(e.key)) return
+      // Ignore modifier-only keypresses (e.g. pressing Control alone)
+      // Only capture when user presses a non-modifier key (possibly with modifiers held)
+      if (isModifierKey(e.key)) return
       const str = keybindToString(e)
+      if (keybindPartCount(str) > 3) {
+        return // Max 3 keys per binding
+      }
       onKeybind?.(str)
     },
     [onKeybind]
@@ -46,7 +52,8 @@ export function KeybindModal({
           </DialogDescription>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
-          Press any key or key combination (e.g. F1, Ctrl+1)
+          One binding per sound. Press a key combination (e.g. Ctrl+1, Ctrl+Shift+1). Hold modifiers
+          first, then press the key.
         </p>
         {existingKeybinds.length > 0 && (
           <div className="flex flex-wrap gap-2">

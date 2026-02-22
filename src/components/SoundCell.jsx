@@ -122,12 +122,12 @@ export function SoundCell({
                 <Volume2 className="size-3" />
               </Button>
             </div>
-            {keybindings.length > 0 && (
-              <div className="text-xs text-muted-foreground flex flex-wrap gap-1">
-                {keybindings.map((k) => (
+            <div className="text-xs text-muted-foreground flex flex-wrap gap-1">
+              {keybindings.length > 0 ? (
+                keybindings.map((k) => (
                   <kbd
                     key={k}
-                    className="px-1 py-0.5 bg-muted rounded text-[10px]"
+                    className="px-1 py-0.5 bg-muted rounded text-[10px] cursor-pointer hover:bg-muted/80"
                     onClick={(e) => {
                       e.stopPropagation()
                       onSetKeybind?.(index)
@@ -135,9 +135,20 @@ export function SoundCell({
                   >
                     {k}
                   </kbd>
-                ))}
-              </div>
-            )}
+                ))
+              ) : (
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onSetKeybind?.(index)
+                  }}
+                >
+                  add binding
+                </button>
+              )}
+            </div>
           </>
         ) : (
           <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground py-4">

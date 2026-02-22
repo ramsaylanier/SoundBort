@@ -111,8 +111,7 @@ function App() {
       if (keybindModalCell == null) return
       const sound = currentSoundboard?.sounds?.[keybindModalCell]
       if (!sound) return
-      const existing = sound.keybindings || []
-      if (existing.includes(keybind)) {
+      if (sound.keybindings?.includes(keybind)) {
         toast.info('Key already bound to this sound')
         return
       }
@@ -120,10 +119,15 @@ function App() {
         ([id, bindings]) => id !== sound.id && bindings?.includes(keybind)
       )
       if (conflict) {
-        toast.warning(`Key ${keybind} is already used by another sound. Both will trigger.`)
+        const [conflictSoundId] = conflict
+        const conflictSound = currentSoundboard?.sounds?.find((s) => s?.id === conflictSoundId)
+        toast.error(
+          `"${keybind}" is already bound to "${conflictSound?.name ?? 'another sound'}". Choose a different key.`
+        )
+        return
       }
-      const newBindings = [...existing, keybind]
-      updateSound(keybindModalCell, { ...sound, keybindings: newBindings })
+      // One binding per sound: replace instead of add
+      updateSound(keybindModalCell, { ...sound, keybindings: [keybind] })
       toast.success(`Bound ${keybind}`)
     },
     [keybindModalCell, currentSoundboard?.sounds, keybindingsMap, updateSound]
@@ -134,9 +138,7 @@ function App() {
       if (keybindModalCell == null) return
       const sound = currentSoundboard?.sounds?.[keybindModalCell]
       if (!sound) return
-      const existing = sound.keybindings || []
-      const newBindings = existing.filter((k) => k !== keybind)
-      updateSound(keybindModalCell, { ...sound, keybindings: newBindings })
+      updateSound(keybindModalCell, { ...sound, keybindings: [] })
       toast.success(`Removed ${keybind}`)
     },
     [keybindModalCell, currentSoundboard?.sounds, updateSound]
