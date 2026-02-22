@@ -24,6 +24,10 @@ npm run dev
 
 Open http://localhost:5173 (HTTPS required for device APIs in production).
 
+## Deploy
+
+Live at [soundbort.vercel.app](https://soundbort.vercel.app).
+
 ## Browser support
 
 - **Output device selection**: Chrome 98+, Edge 98+ (Firefox/Safari use default output)
