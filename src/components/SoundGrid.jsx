@@ -20,7 +20,7 @@ export function SoundGrid({
 
   return (
     <div
-      className="grid gap-3 w-full max-w-2xl"
+      className="grid gap-3 w-full max-w-4xl mx-auto h-full p-2"
       style={{ gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))` }}
     >
       {sounds.map((sound, index) => (

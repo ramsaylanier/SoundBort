@@ -7,8 +7,15 @@ import {
 } from '@/components/ui/sheet'
 import { Slider } from '@/components/ui/slider'
 import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { LevelMeter } from '@/components/LevelMeter'
-import { SlidersHorizontal } from 'lucide-react'
+import { SlidersHorizontal, Mic, MicOff, Speaker } from 'lucide-react'
 import { useAudioLevel } from '@/hooks/useAudioLevel'
 
 const BusRow = ({ label, level, value, onValueChange }) => {
@@ -39,6 +46,14 @@ export function Mixer({
   analyserSoundboardRef,
   analyserMasterRef,
   levelBySoundId = {},
+  outputSelectSupported,
+  selectOutputDevice,
+  inputDevices = [],
+  selectedInputDeviceId,
+  setInputDevice,
+  micMuted,
+  setMicMuted,
+  error,
 }) {
   const micLevel = useAudioLevel(analyserMicRef)
   const soundboardLevel = useAudioLevel(analyserSoundboardRef)
@@ -60,6 +75,54 @@ export function Mixer({
           <SheetTitle>Mixer</SheetTitle>
         </SheetHeader>
         <div className="flex flex-col gap-6 p-4 pt-0">
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium block mb-2">Devices</label>
+              <div className="flex flex-col gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={selectOutputDevice}
+                  disabled={!outputSelectSupported}
+                  className="gap-2 w-full justify-start"
+                >
+                  <Speaker className="size-4 shrink-0" />
+                  {outputSelectSupported ? 'Select output device' : 'Output (use system default)'}
+                </Button>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={selectedInputDeviceId || 'none'}
+                    onValueChange={(v) => setInputDevice?.(v === 'none' ? null : v)}
+                  >
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Select microphone" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No microphone</SelectItem>
+                      {inputDevices.map((d) => (
+                        <SelectItem key={d.deviceId} value={d.deviceId}>
+                          {d.label || `Device ${d.deviceId.slice(0, 8)}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant={micMuted ? 'destructive' : 'outline'}
+                    size="icon"
+                    onClick={() => setMicMuted?.(!micMuted)}
+                    title={micMuted ? 'Unmute mic' : 'Mute mic'}
+                  >
+                    {micMuted ? <MicOff className="size-4" /> : <Mic className="size-4" />}
+                  </Button>
+                </div>
+                {error && (
+                  <p className="text-sm text-destructive" role="alert">
+                    {error}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
           <div className="space-y-4">
             <BusRow
               label="Mic"

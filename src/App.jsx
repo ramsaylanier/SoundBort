@@ -3,7 +3,6 @@ import { Toaster } from '@/components/ui/sonner'
 import { getSoundboard } from '@/utils/soundboardStorage'
 import { STORAGE_KEYS, getStoredGridSize } from '@/constants'
 import { Button } from '@/components/ui/button'
-import { DeviceSelector } from '@/components/DeviceSelector'
 import { Mixer } from '@/components/Mixer'
 import { SoundboardPicker } from '@/components/SoundboardPicker'
 import { SoundGrid } from '@/components/SoundGrid'
@@ -311,9 +310,9 @@ function App() {
   const clipEditSound = clipEditModalCell != null ? currentSoundboard?.sounds?.[clipEditModalCell] : null
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <header className="flex flex-wrap items-center justify-between gap-4">
+    <div className="bg-background">
+      <div className="h-[100vh] grid grid-cols-1 grid-rows-[auto_1fr] overflow-hidden">
+        <header className="flex flex-wrap items-center justify-between gap-4 p-2 border-b">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold">SoundBort</h1>
             <Button
@@ -326,32 +325,6 @@ function App() {
               <Settings className="size-5" />
             </Button>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <DeviceSelector
-              outputSelectSupported={audio.outputSelectSupported}
-              selectOutputDevice={audio.selectOutputDevice}
-              inputDevices={audio.inputDevices}
-              selectedInputDeviceId={audio.selectedInputDeviceId}
-              setInputDevice={audio.setInputDevice}
-              micMuted={audio.micMuted}
-              setMicMuted={audio.setMicMuted}
-              error={audio.error}
-            />
-            <Mixer
-              mixerLevels={mixerLevels}
-              setMixerLevels={setMixerLevels}
-              sounds={currentSoundboard?.sounds}
-              setSoundVolume={setSoundVolume}
-              onSoundVolumeChange={handleSoundVolumeChange}
-              analyserMicRef={analyserMicRef}
-              analyserSoundboardRef={analyserSoundboardRef}
-              analyserMasterRef={analyserMasterRef}
-              levelBySoundId={levelBySoundId}
-            />
-          </div>
-        </header>
-
-        <div className="flex flex-wrap items-center gap-3">
           <SoundboardPicker
             soundboard={
               currentSoundboard
@@ -361,9 +334,28 @@ function App() {
             onLoad={handleLoadSoundboard}
             onSave={() => { }}
           />
-        </div>
+          <Mixer
+            mixerLevels={mixerLevels}
+            setMixerLevels={setMixerLevels}
+            sounds={currentSoundboard?.sounds}
+            setSoundVolume={setSoundVolume}
+            onSoundVolumeChange={handleSoundVolumeChange}
+            analyserMicRef={analyserMicRef}
+            analyserSoundboardRef={analyserSoundboardRef}
+            analyserMasterRef={analyserMasterRef}
+            levelBySoundId={levelBySoundId}
+            outputSelectSupported={audio.outputSelectSupported}
+            selectOutputDevice={audio.selectOutputDevice}
+            inputDevices={audio.inputDevices}
+            selectedInputDeviceId={audio.selectedInputDeviceId}
+            setInputDevice={audio.setInputDevice}
+            micMuted={audio.micMuted}
+            setMicMuted={audio.setMicMuted}
+            error={audio.error}
+          />
+        </header>
 
-        <main>
+        <main className="h-full overflow-hidden">
           <SoundGrid
             sounds={currentSoundboard?.sounds ?? []}
             gridCols={gridCols}
