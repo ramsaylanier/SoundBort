@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Mic, Monitor, Square, Circle } from 'lucide-react'
 import { useAudioRecorder } from '@/hooks/useAudioRecorder'
+import { useAudioDeviceContext } from '@/contexts/AudioDeviceContext'
 
 const TAB_CAPTURE_SUPPORTED = !!navigator.mediaDevices?.getDisplayMedia
 
@@ -23,9 +24,13 @@ export function RecordModal({
   open,
   onClose,
   onRecordComplete,
-  micStream,
-  inputDeviceLabel,
 }) {
+  const audio = useAudioDeviceContext()
+  const micStream = audio.micStream
+  const inputDeviceLabel = audio.inputDevices.find(
+    (d) => d.deviceId === audio.selectedInputDeviceId
+  )?.label
+
   const [source, setSource] = useState('mic')
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const timerRef = useRef(null)

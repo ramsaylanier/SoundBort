@@ -10,7 +10,7 @@ import { BindModal } from '@/components/BindModal'
 import { RecordModal } from '@/components/RecordModal'
 import { ClipEditModal } from '@/components/ClipEditModal'
 import { SettingsModal } from '@/components/SettingsModal'
-import { useAudioDevice } from '@/hooks/useAudioDevice'
+import { useAudioDeviceContext } from '@/contexts/AudioDeviceContext'
 import { useSoundboard } from '@/hooks/useSoundboard'
 import { useKeyboardBindings } from '@/hooks/useKeyboardBindings'
 import { useMIDIAccess } from '@/hooks/useMIDIAccess'
@@ -20,15 +20,12 @@ import { noteNumberToName } from '@/utils/midiUtils'
 import { Settings } from 'lucide-react'
 
 function App() {
-  const audio = useAudioDevice()
+  const audio = useAudioDeviceContext()
   const {
     audioContext,
     soundboardGainRef,
     mixerLevels,
     setMixerLevels,
-    analyserMicRef,
-    analyserSoundboardRef,
-    analyserMasterRef,
   } = audio
 
   const soundboard = useSoundboard(audioContext, soundboardGainRef)
@@ -340,18 +337,7 @@ function App() {
             sounds={currentSoundboard?.sounds}
             setSoundVolume={setSoundVolume}
             onSoundVolumeChange={handleSoundVolumeChange}
-            analyserMicRef={analyserMicRef}
-            analyserSoundboardRef={analyserSoundboardRef}
-            analyserMasterRef={analyserMasterRef}
             levelBySoundId={levelBySoundId}
-            outputSelectSupported={audio.outputSelectSupported}
-            selectOutputDevice={audio.selectOutputDevice}
-            inputDevices={audio.inputDevices}
-            selectedInputDeviceId={audio.selectedInputDeviceId}
-            setInputDevice={audio.setInputDevice}
-            micMuted={audio.micMuted}
-            setMicMuted={audio.setMicMuted}
-            error={audio.error}
           />
         </header>
 
@@ -388,7 +374,6 @@ function App() {
         open={clipEditModalCell != null}
         onClose={() => setClipEditModalCell(null)}
         sound={clipEditSound}
-        audioContext={audioContext}
         onSave={handleClipEditSave}
       />
 
@@ -407,10 +392,6 @@ function App() {
         onClose={() => setRecordModalCell(null)}
         onRecordComplete={(blob, suggestedName) =>
           recordModalCell != null && handleRecordComplete(recordModalCell, blob, suggestedName)
-        }
-        micStream={audio.micStream}
-        inputDeviceLabel={
-          audio.inputDevices.find((d) => d.deviceId === audio.selectedInputDeviceId)?.label
         }
       />
 

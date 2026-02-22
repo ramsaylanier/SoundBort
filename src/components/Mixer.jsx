@@ -17,6 +17,7 @@ import {
 import { LevelMeter } from '@/components/LevelMeter'
 import { SlidersHorizontal, Mic, MicOff, Speaker } from 'lucide-react'
 import { useAudioLevel } from '@/hooks/useAudioLevel'
+import { useAudioDeviceContext } from '@/contexts/AudioDeviceContext'
 
 const BusRow = ({ label, level, value, onValueChange }) => {
 
@@ -42,19 +43,23 @@ export function Mixer({
   sounds,
   setSoundVolume,
   onSoundVolumeChange,
-  analyserMicRef,
-  analyserSoundboardRef,
-  analyserMasterRef,
   levelBySoundId = {},
-  outputSelectSupported,
-  selectOutputDevice,
-  inputDevices = [],
-  selectedInputDeviceId,
-  setInputDevice,
-  micMuted,
-  setMicMuted,
-  error,
 }) {
+  const audio = useAudioDeviceContext()
+  const {
+    analyserMicRef,
+    analyserSoundboardRef,
+    analyserMasterRef,
+    outputSelectSupported,
+    selectOutputDevice,
+    inputDevices = [],
+    selectedInputDeviceId,
+    setInputDevice,
+    micMuted,
+    setMicMuted,
+    error,
+  } = audio
+
   const micLevel = useAudioLevel(analyserMicRef)
   const soundboardLevel = useAudioLevel(analyserSoundboardRef)
   const masterLevel = useAudioLevel(analyserMasterRef)

@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
 import { Play, Square } from 'lucide-react'
+import { useAudioDeviceContext } from '@/contexts/AudioDeviceContext'
 
 function formatTime(seconds) {
   const m = Math.floor(seconds / 60)
@@ -22,9 +23,9 @@ export function ClipEditModal({
   open,
   onClose,
   sound,
-  audioContext,
   onSave,
 }) {
+  const { audioContext } = useAudioDeviceContext()
   const [duration, setDuration] = useState(null)
   const [name, setName] = useState('')
   const [startTime, setStartTime] = useState(0)

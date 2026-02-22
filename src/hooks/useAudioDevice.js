@@ -161,7 +161,7 @@ export function useAudioDevice() {
     if (mediaStreamSourceRef.current) {
       try {
         mediaStreamSourceRef.current.disconnect()
-      } catch {}
+      } catch { }
     }
     const source = audioContext.createMediaStreamSource(micStream)
     mediaStreamSourceRef.current = source
@@ -169,7 +169,7 @@ export function useAudioDevice() {
     return () => {
       try {
         source.disconnect()
-      } catch {}
+      } catch { }
       mediaStreamSourceRef.current = null
     }
   }, [audioContext, micStream])
