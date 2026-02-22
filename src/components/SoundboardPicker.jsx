@@ -51,12 +51,6 @@ export function SoundboardPicker({
     setSaveDialogOpen(true)
   }
 
-  const handleNewSoundboardClick = () => {
-    setIsCreatingNew(true)
-    setSaveName('New Soundboard')
-    setSaveDialogOpen(true)
-  }
-
   const handleSaveConfirm = async () => {
     const name = saveName?.trim() || (isCreatingNew ? 'New Soundboard' : soundboard?.name)
     if (!name) return
