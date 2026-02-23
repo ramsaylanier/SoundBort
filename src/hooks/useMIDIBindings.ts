@@ -6,7 +6,8 @@ export function useMIDIBindings(
   midiAccess: MIDIAccess | null,
   midiBindingsMap: Record<string, MidiBinding[]>,
   onTrigger: (soundId: string) => void | undefined,
-  enabled = true
+  enabled = true,
+  defaultDeviceId?: string
 ) {
   const onTriggerRef = useRef(onTrigger)
   const mapRef = useRef(midiBindingsMap)
@@ -23,11 +24,20 @@ export function useMIDIBindings(
       if (!e.data) return
       const parsed = parseMidiMessage(e.data)
       if (!parsed) return
+      const eventDeviceId = (e.target as MIDIInput)?.id
       const map = mapRef.current
       for (const [soundId, bindings] of Object.entries(map)) {
         if (!Array.isArray(bindings)) continue
         for (const binding of bindings) {
-          if (midiBindingMatches(parsed, binding)) {
+          if (
+            midiBindingMatches(
+              parsed,
+              binding,
+              eventDeviceId,
+              binding.deviceId,
+              defaultDeviceId
+            )
+          ) {
             onTriggerRef.current?.(soundId)
             return
           }
@@ -55,5 +65,5 @@ export function useMIDIBindings(
       })
       midiAccess.removeEventListener('statechange', handleStateChange)
     }
-  }, [midiAccess, enabled])
+  }, [midiAccess, enabled, defaultDeviceId])
 }

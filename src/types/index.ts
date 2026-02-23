@@ -1,6 +1,12 @@
 export interface MidiBinding {
   note: number
   channel: number
+  deviceId?: string
+}
+
+export interface MidiDeviceOption {
+  id: string
+  name: string
 }
 
 export interface Sound {

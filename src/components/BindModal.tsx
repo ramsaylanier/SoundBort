@@ -8,11 +8,18 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { keybindToString, isModifierKey, keybindPartCount } from '@/utils/keybindUtils'
 import { noteNumberToName, parseMidiMessage } from '@/utils/midiUtils'
 import { X, Keyboard, Music } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { MidiBinding } from '@/types'
+import type { MidiBinding, MidiDeviceOption } from '@/types'
 
 const midiSupported = typeof navigator !== 'undefined' && !!navigator.requestMIDIAccess
 
@@ -27,6 +34,8 @@ interface BindModalProps {
   onRemoveMIDIBind?: (_binding: MidiBinding) => void
   existingMIDIBinds?: MidiBinding[]
   midiEnabled?: boolean
+  midiDevices?: MidiDeviceOption[]
+  defaultMidiDeviceId?: string
 }
 
 export function BindModal({
@@ -40,9 +49,23 @@ export function BindModal({
   onRemoveMIDIBind,
   existingMIDIBinds = [],
   midiEnabled,
+  midiDevices = [],
+  defaultMidiDeviceId = '',
 }: BindModalProps) {
   const [activeTab, setActiveTab] = useState<'keyboard' | 'midi'>('keyboard')
   const [midiAccess, setMidiAccess] = useState<MIDIAccess | null>(null)
+  const [selectedMidiDeviceId, setSelectedMidiDeviceId] = useState<string>(() =>
+    defaultMidiDeviceId || (midiDevices[0]?.id ?? '')
+  )
+
+  useEffect(() => {
+    if (open && activeTab === 'midi') {
+      const fallback = defaultMidiDeviceId || (midiDevices[0]?.id ?? '')
+      setSelectedMidiDeviceId((prev) =>
+        midiDevices.some((d) => d.id === prev) ? prev : fallback
+      )
+    }
+  }, [open, activeTab, defaultMidiDeviceId, midiDevices])
 
   useEffect(() => {
     if (!open || !midiEnabled || !midiSupported) {
@@ -68,9 +91,12 @@ export function BindModal({
     (e: MIDIMessageEvent) => {
       if (!e.data) return
       const parsed = parseMidiMessage(e.data)
-      if (parsed) onMIDIBind?.(parsed)
+      if (parsed) {
+        const deviceId = selectedMidiDeviceId || undefined
+        onMIDIBind?.({ ...parsed, deviceId })
+      }
     },
-    [onMIDIBind]
+    [onMIDIBind, selectedMidiDeviceId]
   )
 
   useEffect(() => {
@@ -84,15 +110,20 @@ export function BindModal({
   useEffect(() => {
     if (!open || activeTab !== 'midi' || !midiAccess) return
     const handleMessage = (e: MIDIMessageEvent) => handleMidiMessage(e)
-    midiAccess.inputs?.forEach((input) => {
+    const inputs = midiAccess.inputs
+    if (!inputs) return
+    const toAttach = selectedMidiDeviceId
+      ? Array.from(inputs).filter((i) => i.id === selectedMidiDeviceId)
+      : Array.from(inputs)
+    toAttach.forEach((input) => {
       input.onmidimessage = handleMessage
     })
     return () => {
-      midiAccess.inputs?.forEach((input) => {
+      toAttach.forEach((input) => {
         input.onmidimessage = null
       })
     }
-  }, [open, activeTab, midiAccess, handleMidiMessage])
+  }, [open, activeTab, midiAccess, selectedMidiDeviceId, handleMidiMessage])
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose?.()}>
@@ -174,6 +205,29 @@ export function BindModal({
               </p>
             ) : (
               <>
+                {midiDevices.length > 0 && (
+                  <div className="space-y-2">
+                    <label htmlFor="bind-midi-device" className="text-sm font-medium">
+                      MIDI device
+                    </label>
+                    <Select
+                      value={selectedMidiDeviceId || 'all'}
+                      onValueChange={(v) => setSelectedMidiDeviceId(v === 'all' ? '' : v)}
+                    >
+                      <SelectTrigger id="bind-midi-device" className="w-full">
+                        <SelectValue placeholder="Select device" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All devices</SelectItem>
+                        {midiDevices.map((d) => (
+                          <SelectItem key={d.id} value={d.id}>
+                            {d.name || d.id}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <p className="text-sm text-muted-foreground">
                   Press a MIDI key on your controller. One binding per sound.
                 </p>

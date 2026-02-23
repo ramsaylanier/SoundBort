@@ -16,7 +16,7 @@ import { useKeyboardBindings } from '@/hooks/useKeyboardBindings'
 import { useMIDIAccess } from '@/hooks/useMIDIAccess'
 import { useMIDIBindings } from '@/hooks/useMIDIBindings'
 import { toast } from 'sonner'
-import { noteNumberToName } from '@/utils/midiUtils'
+import { noteNumberToName, midiBindingsConflict } from '@/utils/midiUtils'
 import { Settings } from 'lucide-react'
 import type { Sound, Soundboard, MidiBinding } from '@/types'
 
@@ -51,6 +51,9 @@ function App() {
   const [midiEnabled, setMidiEnabled] = useState(
     () => localStorage.getItem(STORAGE_KEYS.MIDI_ENABLED) === 'true'
   )
+  const [defaultMidiDeviceId, setDefaultMidiDeviceId] = useState(
+    () => localStorage.getItem(STORAGE_KEYS.MIDI_DEFAULT_DEVICE_ID) ?? ''
+  )
 
   useEffect(() => {
     if (audio.error) toast.error(audio.error)
@@ -73,6 +76,13 @@ function App() {
   }, [currentSoundboard])
 
   const { midiAccess } = useMIDIAccess(midiEnabled)
+  const midiDevices = useMemo(() => {
+    if (!midiAccess?.inputs) return []
+    return Array.from(midiAccess.inputs.values()).map((input) => ({
+      id: input.id,
+      name: input.name || input.id,
+    }))
+  }, [midiAccess])
   const handleKeybindTrigger = useCallback(
     (soundId: string) => {
       const sound = currentSoundboard?.sounds?.find((s) => s?.id === soundId)
@@ -82,7 +92,13 @@ function App() {
   )
 
   useKeyboardBindings(keybindingsMap, handleKeybindTrigger, !!currentSoundboard)
-  useMIDIBindings(midiAccess, midiBindingsMap, handleKeybindTrigger, !!currentSoundboard && midiEnabled)
+  useMIDIBindings(
+    midiAccess,
+    midiBindingsMap,
+    handleKeybindTrigger,
+    !!currentSoundboard && midiEnabled,
+    defaultMidiDeviceId || undefined
+  )
 
   const handleUpload = useCallback(
     (index: number, file: File) => {
@@ -168,14 +184,14 @@ function App() {
       const sound = currentSoundboard?.sounds?.[keybindModalCell]
       if (!sound) return
       const existing = sound.midiBindings ?? []
-      if (existing.some((b) => b.note === binding.note && b.channel === binding.channel)) {
+      if (existing.some((b) => midiBindingsConflict(binding, b))) {
         toast.info('MIDI note already bound to this sound')
         return
       }
       const conflict = Object.entries(midiBindingsMap).find(
         ([id, bindings]) =>
           id !== sound.id &&
-          bindings?.some((b) => b.note === binding.note && b.channel === binding.channel)
+          bindings?.some((b) => midiBindingsConflict(binding, b))
       )
       if (conflict) {
         const [conflictSoundId] = conflict
@@ -367,6 +383,8 @@ function App() {
         onRemoveMIDIBind={handleRemoveMIDIBind}
         existingMIDIBinds={modalSound?.midiBindings ?? []}
         midiEnabled={midiEnabled}
+        midiDevices={midiDevices}
+        defaultMidiDeviceId={defaultMidiDeviceId}
       />
 
       <ClipEditModal
@@ -384,6 +402,12 @@ function App() {
         onGridChange={handleGridChange}
         midiEnabled={midiEnabled}
         onMidiEnabledChange={setMidiEnabled}
+        midiDevices={midiDevices}
+        defaultMidiDeviceId={defaultMidiDeviceId}
+        onDefaultMidiDeviceChange={(id) => {
+          setDefaultMidiDeviceId(id)
+          localStorage.setItem(STORAGE_KEYS.MIDI_DEFAULT_DEVICE_ID, id)
+        }}
       />
 
       <RecordModal

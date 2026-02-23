@@ -3,6 +3,7 @@ export const STORAGE_KEYS = {
   INPUT_DEVICE_ID: 'soundbort_input_device_id',
   ACTIVE_SOUNDBOARD_ID: 'soundbort_active_soundboard_id',
   MIDI_ENABLED: 'soundbort_midi_enabled',
+  MIDI_DEFAULT_DEVICE_ID: 'soundbort_midi_default_device_id',
   GRID_ROWS: 'soundbort_grid_rows',
   GRID_COLS: 'soundbort_grid_cols',
 } as const

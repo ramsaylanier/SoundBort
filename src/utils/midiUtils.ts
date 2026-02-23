@@ -28,8 +28,24 @@ export function parseMidiMessage(data: Uint8Array | number[]): MidiParsed | null
 
 export function midiBindingMatches(
   parsed: MidiParsed | null,
-  binding: MidiParsed | null
+  binding: MidiParsed | null,
+  eventDeviceId?: string,
+  bindingDeviceId?: string,
+  defaultDeviceId?: string
 ): boolean {
   if (!parsed || !binding) return false
-  return parsed.note === binding.note && parsed.channel === binding.channel
+  if (parsed.note !== binding.note || parsed.channel !== binding.channel) return false
+  if (bindingDeviceId) return eventDeviceId === bindingDeviceId
+  if (defaultDeviceId) return eventDeviceId === defaultDeviceId
+  return true
+}
+
+export function midiBindingsConflict(
+  a: { note: number; channel: number; deviceId?: string },
+  b: { note: number; channel: number; deviceId?: string }
+): boolean {
+  if (a.note !== b.note || a.channel !== b.channel) return false
+  if (!a.deviceId && !b.deviceId) return true
+  if (a.deviceId && b.deviceId) return a.deviceId === b.deviceId
+  return true
 }

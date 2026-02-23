@@ -9,6 +9,13 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { STORAGE_KEYS, MIN_GRID, MAX_GRID, getStoredGridSize } from '@/constants'
 import { cn } from '@/lib/utils'
 
@@ -22,6 +29,9 @@ interface SettingsModalProps {
   onGridChange: (rows: number, cols: number) => void
   midiEnabled: boolean
   onMidiEnabledChange: (enabled: boolean) => void
+  midiDevices?: { id: string; name: string }[]
+  defaultMidiDeviceId?: string
+  onDefaultMidiDeviceChange?: (deviceId: string) => void
 }
 
 export function SettingsModal({
@@ -32,6 +42,9 @@ export function SettingsModal({
   onGridChange,
   midiEnabled,
   onMidiEnabledChange,
+  midiDevices = [],
+  defaultMidiDeviceId = '',
+  onDefaultMidiDeviceChange,
 }: SettingsModalProps) {
   const [localRows, setLocalRows] = useState(() => gridRows ?? getStoredGridSize().rows)
   const [localCols, setLocalCols] = useState(() => gridCols ?? getStoredGridSize().cols)
@@ -128,6 +141,32 @@ export function SettingsModal({
               <p className="text-sm text-destructive" role="alert">
                 {midiError}
               </p>
+            )}
+            {midiEnabled && midiDevices.length > 0 && (
+              <div className="space-y-2">
+                <label htmlFor="default-midi-device" className="text-sm font-medium">
+                  Default MIDI device
+                </label>
+                <Select
+                  value={defaultMidiDeviceId || 'all'}
+                  onValueChange={(v) => onDefaultMidiDeviceChange?.(v === 'all' ? '' : v)}
+                >
+                  <SelectTrigger id="default-midi-device" className="w-full">
+                    <SelectValue placeholder="Select device" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All devices</SelectItem>
+                    {midiDevices.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.name || d.id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Used for new bindings and legacy bindings without a device.
+                </p>
+              </div>
             )}
           </div>
 
