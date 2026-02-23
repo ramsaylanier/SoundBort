@@ -36,6 +36,7 @@ interface BindModalProps {
   midiEnabled?: boolean
   midiDevices?: MidiDeviceOption[]
   defaultMidiDeviceId?: string
+  midiAccess?: MIDIAccess | null
 }
 
 export function BindModal({
@@ -51,9 +52,11 @@ export function BindModal({
   midiEnabled,
   midiDevices = [],
   defaultMidiDeviceId = '',
+  midiAccess: midiAccessProp,
 }: BindModalProps) {
   const [activeTab, setActiveTab] = useState<'keyboard' | 'midi'>('keyboard')
-  const [midiAccess, setMidiAccess] = useState<MIDIAccess | null>(null)
+  const [midiAccessLocal, setMidiAccessLocal] = useState<MIDIAccess | null>(null)
+  const midiAccess = midiAccessProp ?? midiAccessLocal
   const [selectedMidiDeviceId, setSelectedMidiDeviceId] = useState<string>(() =>
     defaultMidiDeviceId || (midiDevices[0]?.id ?? '')
   )
@@ -68,12 +71,12 @@ export function BindModal({
   }, [open, activeTab, defaultMidiDeviceId, midiDevices])
 
   useEffect(() => {
-    if (!open || !midiEnabled || !midiSupported) {
-      queueMicrotask(() => setMidiAccess(null))
+    if (!open || !midiEnabled || !midiSupported || midiAccessProp != null) {
+      if (!midiAccessProp) queueMicrotask(() => setMidiAccessLocal(null))
       return
     }
-    navigator.requestMIDIAccess().then(setMidiAccess).catch(() => setMidiAccess(null))
-  }, [open, midiEnabled])
+    navigator.requestMIDIAccess().then(setMidiAccessLocal).catch(() => setMidiAccessLocal(null))
+  }, [open, midiEnabled, midiAccessProp])
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -92,7 +95,7 @@ export function BindModal({
       if (!e.data) return
       const parsed = parseMidiMessage(e.data)
       if (parsed) {
-        const deviceId = selectedMidiDeviceId || undefined
+        const deviceId = ((e.target as MIDIInput)?.id ?? selectedMidiDeviceId) || undefined
         onMIDIBind?.({ ...parsed, deviceId })
       }
     },
@@ -112,15 +115,16 @@ export function BindModal({
     const handleMessage = (e: MIDIMessageEvent) => handleMidiMessage(e)
     const inputs = midiAccess.inputs
     if (!inputs) return
+    const inputList = Array.from(inputs.values())
     const toAttach = selectedMidiDeviceId
-      ? Array.from(inputs).filter((i) => i.id === selectedMidiDeviceId)
-      : Array.from(inputs)
+      ? inputList.filter((i) => i.id === selectedMidiDeviceId)
+      : inputList
     toAttach.forEach((input) => {
-      input.onmidimessage = handleMessage
+      input.addEventListener('midimessage', handleMessage)
     })
     return () => {
       toAttach.forEach((input) => {
-        input.onmidimessage = null
+        input.removeEventListener('midimessage', handleMessage)
       })
     }
   }, [open, activeTab, midiAccess, selectedMidiDeviceId, handleMidiMessage])

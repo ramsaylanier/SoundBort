@@ -20,9 +20,7 @@ export function parseMidiMessage(data: Uint8Array | number[]): MidiParsed | null
   const channel = data[0] & 0x0f
   const note = data[1]
   const velocity = data[2]
-  if (status === NOTE_ON && velocity > 0) {
-    return { note, channel }
-  }
+  if (status === NOTE_ON && velocity > 0) return { note, channel }
   return null
 }
 

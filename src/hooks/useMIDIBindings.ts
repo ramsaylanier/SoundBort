@@ -7,7 +7,8 @@ export function useMIDIBindings(
   midiBindingsMap: Record<string, MidiBinding[]>,
   onTrigger: (soundId: string) => void | undefined,
   enabled = true,
-  defaultDeviceId?: string
+  defaultDeviceId?: string,
+  bindModalOpen = false
 ) {
   const onTriggerRef = useRef(onTrigger)
   const mapRef = useRef(midiBindingsMap)
@@ -18,7 +19,7 @@ export function useMIDIBindings(
   })
 
   useEffect(() => {
-    if (!enabled || !midiAccess) return
+    if (!enabled || !midiAccess || bindModalOpen) return
 
     const handleMessage = (e: MIDIMessageEvent) => {
       if (!e.data) return
@@ -65,5 +66,5 @@ export function useMIDIBindings(
       })
       midiAccess.removeEventListener('statechange', handleStateChange)
     }
-  }, [midiAccess, enabled, defaultDeviceId])
+  }, [midiAccess, enabled, defaultDeviceId, bindModalOpen])
 }

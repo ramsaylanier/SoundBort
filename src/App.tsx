@@ -60,6 +60,7 @@ function App() {
   }, [audio.error])
 
   const keybindingsMap = useMemo(() => {
+    console.log(currentSoundboard?.sounds)
     const map: Record<string, string[]> = {}
     currentSoundboard?.sounds?.forEach((s) => {
       if (s?.keybindings?.length) map[s.id] = s.keybindings
@@ -97,7 +98,8 @@ function App() {
     midiBindingsMap,
     handleKeybindTrigger,
     !!currentSoundboard && midiEnabled,
-    defaultMidiDeviceId || undefined
+    defaultMidiDeviceId || undefined,
+    keybindModalCell != null
   )
 
   const handleUpload = useCallback(
@@ -344,7 +346,7 @@ function App() {
                 : null
             }
             onLoad={handleLoadSoundboard}
-            onSave={() => {}}
+            onSave={() => { }}
           />
           <Mixer
             mixerLevels={mixerLevels}
@@ -385,6 +387,7 @@ function App() {
         midiEnabled={midiEnabled}
         midiDevices={midiDevices}
         defaultMidiDeviceId={defaultMidiDeviceId}
+        midiAccess={midiAccess}
       />
 
       <ClipEditModal
