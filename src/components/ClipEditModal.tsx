@@ -9,8 +9,8 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Slider } from '@/components/ui/slider'
 import { Play, Square } from 'lucide-react'
+import { WaveformRangeSelector } from '@/components/WaveformRangeSelector'
 import { useAudioDeviceStore } from '@/stores/useAudioDeviceStore'
 import { useModalStore } from '@/stores/useModalStore'
 import { useSoundboardStore } from '@/stores/useSoundboardStore'
@@ -123,26 +123,6 @@ export function ClipEditModal() {
     [startTime, duration]
   )
 
-  const handleRangeChange = useCallback(
-    ([a, b]: number[]) => {
-      if (duration == null) return
-      const [startPct, endPct] = a <= b ? [a, b] : [b, a]
-      const start = (startPct / 100) * duration
-      const end = (endPct / 100) * duration
-      setStartTime(Math.max(0, Math.min(start, duration - 0.01)))
-      setEndTime(Math.max(start + 0.01, Math.min(end, duration)))
-    },
-    [duration]
-  )
-
-  const rangeValue =
-    duration != null && duration > 0
-      ? [
-          Number(((startTime / duration) * 100).toFixed(1)),
-          Number((((endTime ?? duration) / duration) * 100).toFixed(1)),
-        ]
-      : [0, 100]
-
   const canSave = duration != null && startTime < (endTime ?? duration)
 
   const handlePreview = useCallback(() => {
@@ -214,13 +194,17 @@ export function ClipEditModal() {
             </p>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Range (0–100%)</label>
-              <Slider
-                value={rangeValue}
-                onValueChange={handleRangeChange}
-                min={0}
-                max={100}
-                step={0.5}
+              <label className="text-sm font-medium">Clip range</label>
+              <p className="text-xs text-muted-foreground">
+                Drag the handles or click-and-drag on the waveform to set start and end.
+              </p>
+              <WaveformRangeSelector
+                buffer={bufferRef.current}
+                duration={duration}
+                startTime={startTime}
+                endTime={endTime ?? duration}
+                onStartChange={setStartTime}
+                onEndChange={(t) => setEndTime(t)}
               />
             </div>
 
