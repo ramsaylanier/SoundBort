@@ -10,6 +10,7 @@ export function useAudioDeviceInit() {
   const selectedOutputDeviceId = useAudioDeviceStore((s) => s.selectedOutputDeviceId)
   const mixerLevels = useAudioDeviceStore((s) => s.mixerLevels)
   const micMuted = useAudioDeviceStore((s) => s.micMuted)
+  const isRecording = useAudioDeviceStore((s) => s.isRecording)
   const setMicStream = useAudioDeviceStore((s) => s.setMicStream)
   const setOutputDevice = useAudioDeviceStore((s) => s.setOutputDevice)
   const setSelectedOutputDeviceId = useAudioDeviceStore((s) => s.setSelectedOutputDeviceId)
@@ -66,7 +67,23 @@ export function useAudioDeviceInit() {
       setOutputSelectSupported(!!navigator.mediaDevices?.selectAudioOutput)
     })
 
+    // Resume AudioContext on first user interaction (required for MIDI/keyboard to play without mic)
+    const resumeOnInteraction = async () => {
+      if (ctx.state === 'suspended') {
+        await ctx.resume()
+      }
+      for (const ev of ['click', 'keydown', 'touchstart'] as const) {
+        document.removeEventListener(ev, resumeOnInteraction)
+      }
+    }
+    document.addEventListener('click', resumeOnInteraction)
+    document.addEventListener('keydown', resumeOnInteraction)
+    document.addEventListener('touchstart', resumeOnInteraction)
+
     return () => {
+      for (const ev of ['click', 'keydown', 'touchstart'] as const) {
+        document.removeEventListener(ev, resumeOnInteraction)
+      }
       ctx.close()
       clearAudioGraph()
     }
@@ -164,10 +181,11 @@ export function useAudioDeviceInit() {
 
   // Consolidated gain sync (Phase 4 cleanup - single effect)
   // Web Audio GainNode.gain.value is intentionally mutable - we sync store state to the audio graph
+  // Mic output only audible during recording; otherwise muted to avoid unwanted monitoring
   useEffect(() => {
     /* eslint-disable react-hooks/immutability -- GainNode.gain.value is a Web Audio API mutable property */
     if (micGainRef) {
-      micGainRef.gain.value = micMuted ? 0 : mixerLevels.mic
+      micGainRef.gain.value = isRecording && !micMuted ? mixerLevels.mic : 0
     }
     if (soundboardGainRef) {
       soundboardGainRef.gain.value = mixerLevels.soundboard
@@ -176,5 +194,5 @@ export function useAudioDeviceInit() {
       masterGainRef.gain.value = mixerLevels.master
     }
     /* eslint-enable react-hooks/immutability */
-  }, [micGainRef, soundboardGainRef, masterGainRef, micMuted, mixerLevels])
+  }, [micGainRef, soundboardGainRef, masterGainRef, micMuted, mixerLevels, isRecording])
 }

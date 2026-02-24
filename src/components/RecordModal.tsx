@@ -46,6 +46,12 @@ export function RecordModal() {
     clearRecordedBlob,
   } = useAudioRecorder()
 
+  const setIsRecording = useAudioDeviceStore((s) => s.setIsRecording)
+  useEffect(() => {
+    setIsRecording(isRecording)
+    return () => setIsRecording(false)
+  }, [isRecording, setIsRecording])
+
   useEffect(() => {
     if (isRecording) {
       queueMicrotask(() => setElapsedSeconds(0))

@@ -28,6 +28,7 @@ interface AudioDeviceState {
   outputDevice: MediaDeviceInfo | { deviceId: string; label: string } | null
   micStream: MediaStream | null
   micMuted: boolean
+  isRecording: boolean
   error: string | null
   outputSelectSupported: boolean
   mediaStreamSourceRef: MediaStreamAudioSourceNode | null
@@ -48,6 +49,7 @@ interface AudioDeviceActions {
   setInputDevices: (devices: MediaDeviceInfo[]) => void
   setOutputSelectSupported: (supported: boolean) => void
   setMediaStreamSourceRef: (source: MediaStreamAudioSourceNode | null) => void
+  setIsRecording: (recording: boolean) => void
 }
 
 const initialInputId = localStorage.getItem(STORAGE_KEYS.INPUT_DEVICE_ID)
@@ -68,6 +70,7 @@ export const useAudioDeviceStore = create<AudioDeviceState & AudioDeviceActions>
   outputDevice: null,
   micStream: null,
   micMuted: false,
+  isRecording: false,
   error: null,
   outputSelectSupported: false,
   mediaStreamSourceRef: null,
@@ -119,6 +122,7 @@ export const useAudioDeviceStore = create<AudioDeviceState & AudioDeviceActions>
   setInputDevices: (devices) => set({ inputDevices: devices }),
   setOutputSelectSupported: (supported) => set({ outputSelectSupported: supported }),
   setMediaStreamSourceRef: (source) => set({ mediaStreamSourceRef: source }),
+  setIsRecording: (recording) => set({ isRecording: recording }),
 
   selectOutputDevice: async () => {
     if (!navigator.mediaDevices?.selectAudioOutput) {

@@ -37,6 +37,13 @@ export function useSoundboardInit() {
   const playSound = useCallback(
     async (sound: Sound, volume = 1) => {
       if (!audioContext || !sound?.audioBlob) return
+      if (audioContext.state === 'suspended') {
+        try {
+          await audioContext.resume()
+        } catch {
+          /* resume may fail without user gesture (e.g. MIDI); document listener handles first interaction */
+        }
+      }
       try {
         let buffer = audioBuffersRef.current.get(sound.id)
         if (!buffer) {

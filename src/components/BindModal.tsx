@@ -57,6 +57,7 @@ export function BindModal() {
   const [selectedMidiDeviceId, setSelectedMidiDeviceId] = useState<string>(() =>
     defaultMidiDeviceId || (midiDevices[0]?.id ?? '')
   )
+  const [selectedMidiChannel, setSelectedMidiChannel] = useState<'from-controller' | number>('from-controller')
 
   const keybindingsMap = useMemo(() => {
     const map: Record<string, string[]> = {}
@@ -169,10 +170,11 @@ export function BindModal() {
       const parsed = parseMidiMessage(e.data)
       if (parsed) {
         const deviceId = ((e.target as MIDIInput)?.id ?? selectedMidiDeviceId) || undefined
-        handleMIDIBind({ ...parsed, deviceId })
+        const channel = selectedMidiChannel === 'from-controller' ? parsed.channel : selectedMidiChannel
+        handleMIDIBind({ ...parsed, channel, deviceId })
       }
     },
-    [handleMIDIBind, selectedMidiDeviceId]
+    [handleMIDIBind, selectedMidiDeviceId, selectedMidiChannel]
   )
 
   useEffect(() => {
@@ -305,13 +307,36 @@ export function BindModal() {
                     </Select>
                   </div>
                 )}
+                <div className="space-y-2">
+                  <label htmlFor="bind-midi-channel" className="text-sm font-medium">
+                    MIDI channel
+                  </label>
+                  <Select
+                    value={selectedMidiChannel === 'from-controller' ? 'from-controller' : String(selectedMidiChannel)}
+                    onValueChange={(v) =>
+                      setSelectedMidiChannel(v === 'from-controller' ? 'from-controller' : Number(v))
+                    }
+                  >
+                    <SelectTrigger id="bind-midi-channel" className="w-full">
+                      <SelectValue placeholder="Select channel" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="from-controller">From controller</SelectItem>
+                      {Array.from({ length: 16 }, (_, i) => (
+                        <SelectItem key={i} value={String(i)}>
+                          Channel {i + 1}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <p className="text-sm text-muted-foreground">
                   Press a MIDI key on your controller. One binding per sound.
                 </p>
                 {existingMIDIBinds.length > 0 && (
                   <div className="flex flex-wrap gap-2">
                     {existingMIDIBinds.map((b) => {
-                      const label = noteNumberToName(b.note)
+                      const label = `${noteNumberToName(b.note)} (Ch ${b.channel + 1})`
                       return (
                         <span
                           key={`${b.note}-${b.channel}`}
