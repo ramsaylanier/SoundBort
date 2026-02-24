@@ -2,12 +2,11 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App'
-import { AudioDeviceProvider } from '@/contexts/AudioDeviceProvider'
+import { AudioInit } from '@/components/AudioInit'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <AudioDeviceProvider>
-      <App />
-    </AudioDeviceProvider>
+    <AudioInit />
+    <App />
   </StrictMode>,
 )

@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from 'react'
+import { useEffect, useCallback, useState, useMemo } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -16,44 +16,41 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { keybindToString, isModifierKey, keybindPartCount } from '@/utils/keybindUtils'
-import { noteNumberToName, parseMidiMessage } from '@/utils/midiUtils'
+import { noteNumberToName, parseMidiMessage, midiBindingsConflict } from '@/utils/midiUtils'
 import { X, Keyboard, Music } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { MidiBinding, MidiDeviceOption } from '@/types'
+import { toast } from 'sonner'
+import { useModalStore } from '@/stores/useModalStore'
+import { useSoundboardStore } from '@/stores/useSoundboardStore'
+import { useSettingsStore } from '@/stores/useSettingsStore'
+import { useMIDIAccess } from '@/hooks/useMIDIAccess'
+import type { MidiBinding } from '@/types'
 
 const midiSupported = typeof navigator !== 'undefined' && !!navigator.requestMIDIAccess
 
-interface BindModalProps {
-  open: boolean
-  onClose: () => void
-  soundName?: string
-  onKeybind?: (_keybind: string) => void
-  onRemoveKeybind?: (_keybind: string) => void
-  existingKeybinds?: string[]
-  onMIDIBind?: (_binding: MidiBinding) => void
-  onRemoveMIDIBind?: (_binding: MidiBinding) => void
-  existingMIDIBinds?: MidiBinding[]
-  midiEnabled?: boolean
-  midiDevices?: MidiDeviceOption[]
-  defaultMidiDeviceId?: string
-  midiAccess?: MIDIAccess | null
-}
+export function BindModal() {
+  const keybindModalCell = useModalStore((s) => s.keybindModalCell)
+  const closeKeybindModal = useModalStore((s) => s.closeKeybindModal)
+  const soundboard = useSoundboardStore((s) => s.soundboard)
+  const updateSound = useSoundboardStore((s) => s.updateSound)
+  const midiEnabled = useSettingsStore((s) => s.midiEnabled)
+  const defaultMidiDeviceId = useSettingsStore((s) => s.defaultMidiDeviceId)
 
-export function BindModal({
-  open,
-  onClose,
-  soundName,
-  onKeybind,
-  onRemoveKeybind,
-  existingKeybinds = [],
-  onMIDIBind,
-  onRemoveMIDIBind,
-  existingMIDIBinds = [],
-  midiEnabled,
-  midiDevices = [],
-  defaultMidiDeviceId = '',
-  midiAccess: midiAccessProp,
-}: BindModalProps) {
+  const { midiAccess: midiAccessProp } = useMIDIAccess(midiEnabled)
+  const midiDevices = useMemo(() => {
+    if (!midiAccessProp?.inputs) return []
+    return Array.from(midiAccessProp.inputs.values()).map((input) => ({
+      id: input.id,
+      name: input.name || input.id,
+    }))
+  }, [midiAccessProp])
+
+  const open = keybindModalCell != null
+  const modalSound = keybindModalCell != null ? soundboard?.sounds?.[keybindModalCell] ?? null : null
+  const soundName = modalSound?.name
+  const existingKeybinds = modalSound?.keybindings ?? []
+  const existingMIDIBinds = modalSound?.midiBindings ?? []
+
   const [activeTab, setActiveTab] = useState<'keyboard' | 'midi'>('keyboard')
   const [midiAccessLocal, setMidiAccessLocal] = useState<MIDIAccess | null>(null)
   const midiAccess = midiAccessProp ?? midiAccessLocal
@@ -61,14 +58,21 @@ export function BindModal({
     defaultMidiDeviceId || (midiDevices[0]?.id ?? '')
   )
 
-  useEffect(() => {
-    if (open && activeTab === 'midi') {
-      const fallback = defaultMidiDeviceId || (midiDevices[0]?.id ?? '')
-      setSelectedMidiDeviceId((prev) =>
-        midiDevices.some((d) => d.id === prev) ? prev : fallback
-      )
-    }
-  }, [open, activeTab, defaultMidiDeviceId, midiDevices])
+  const keybindingsMap = useMemo(() => {
+    const map: Record<string, string[]> = {}
+    soundboard?.sounds?.forEach((s) => {
+      if (s?.keybindings?.length) map[s.id] = s.keybindings
+    })
+    return map
+  }, [soundboard])
+
+  const midiBindingsMap = useMemo(() => {
+    const map: Record<string, MidiBinding[]> = {}
+    soundboard?.sounds?.forEach((s) => {
+      if (s?.midiBindings?.length) map[s.id] = s.midiBindings
+    })
+    return map
+  }, [soundboard])
 
   useEffect(() => {
     if (!open || !midiEnabled || !midiSupported || midiAccessProp != null) {
@@ -78,6 +82,75 @@ export function BindModal({
     navigator.requestMIDIAccess().then(setMidiAccessLocal).catch(() => setMidiAccessLocal(null))
   }, [open, midiEnabled, midiAccessProp])
 
+  const handleKeybind = useCallback(
+    (keybind: string) => {
+      if (keybindModalCell == null || !modalSound) return
+      if (modalSound.keybindings?.includes(keybind)) {
+        toast.info('Key already bound to this sound')
+        return
+      }
+      const conflict = Object.entries(keybindingsMap).find(
+        ([id, bindings]) => id !== modalSound.id && bindings?.includes(keybind)
+      )
+      if (conflict) {
+        const [conflictSoundId] = conflict
+        const conflictSound = soundboard?.sounds?.find((s) => s?.id === conflictSoundId)
+        toast.error(
+          `"${keybind}" is already bound to "${conflictSound?.name ?? 'another sound'}". Choose a different key.`
+        )
+        return
+      }
+      updateSound(keybindModalCell, { ...modalSound, keybindings: [keybind] })
+      toast.success(`Bound ${keybind}`)
+    },
+    [keybindModalCell, modalSound, keybindingsMap, soundboard, updateSound]
+  )
+
+  const handleRemoveKeybind = useCallback(
+    (keybind: string) => {
+      if (keybindModalCell == null || !modalSound) return
+      updateSound(keybindModalCell, { ...modalSound, keybindings: [] })
+      toast.success(`Removed ${keybind}`)
+    },
+    [keybindModalCell, modalSound, updateSound]
+  )
+
+  const handleMIDIBind = useCallback(
+    (binding: MidiBinding) => {
+      if (keybindModalCell == null || !modalSound) return
+      const existing = modalSound.midiBindings ?? []
+      if (existing.some((b) => midiBindingsConflict(binding, b))) {
+        toast.info('MIDI note already bound to this sound')
+        return
+      }
+      const conflict = Object.entries(midiBindingsMap).find(
+        ([id, bindings]) =>
+          id !== modalSound.id &&
+          bindings?.some((b) => midiBindingsConflict(binding, b))
+      )
+      if (conflict) {
+        const [conflictSoundId] = conflict
+        const conflictSound = soundboard?.sounds?.find((s) => s?.id === conflictSoundId)
+        toast.error(
+          `This note is already bound to "${conflictSound?.name ?? 'another sound'}". Choose a different note.`
+        )
+        return
+      }
+      updateSound(keybindModalCell, { ...modalSound, midiBindings: [binding] })
+      toast.success(`Bound ${noteNumberToName(binding.note)}`)
+    },
+    [keybindModalCell, modalSound, midiBindingsMap, soundboard, updateSound]
+  )
+
+  const handleRemoveMIDIBind = useCallback(
+    (binding: MidiBinding) => {
+      if (keybindModalCell == null || !modalSound) return
+      updateSound(keybindModalCell, { ...modalSound, midiBindings: [] })
+      toast.success(`Removed ${noteNumberToName(binding.note)}`)
+    },
+    [keybindModalCell, modalSound, updateSound]
+  )
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       e.preventDefault()
@@ -85,9 +158,9 @@ export function BindModal({
       if (isModifierKey(e.key)) return
       const str = keybindToString(e)
       if (keybindPartCount(str) > 3) return
-      onKeybind?.(str)
+      handleKeybind(str)
     },
-    [onKeybind]
+    [handleKeybind]
   )
 
   const handleMidiMessage = useCallback(
@@ -96,10 +169,10 @@ export function BindModal({
       const parsed = parseMidiMessage(e.data)
       if (parsed) {
         const deviceId = ((e.target as MIDIInput)?.id ?? selectedMidiDeviceId) || undefined
-        onMIDIBind?.({ ...parsed, deviceId })
+        handleMIDIBind({ ...parsed, deviceId })
       }
     },
-    [onMIDIBind, selectedMidiDeviceId]
+    [handleMIDIBind, selectedMidiDeviceId]
   )
 
   useEffect(() => {
@@ -130,8 +203,8 @@ export function BindModal({
   }, [open, activeTab, midiAccess, selectedMidiDeviceId, handleMidiMessage])
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose?.()}>
-      <DialogContent onPointerDownOutside={onClose}>
+    <Dialog open={open} onOpenChange={(o) => !o && closeKeybindModal()}>
+      <DialogContent key={open ? 'open' : 'closed'} onPointerDownOutside={closeKeybindModal}>
         <DialogHeader>
           <DialogTitle>Set binding</DialogTitle>
           <DialogDescription>
@@ -184,7 +257,7 @@ export function BindModal({
                     <kbd className="text-xs">{k}</kbd>
                     <button
                       type="button"
-                      onClick={() => onRemoveKeybind?.(k)}
+                      onClick={() => handleRemoveKeybind(k)}
                       className="p-0.5 rounded hover:bg-muted-foreground/20"
                       aria-label={`Remove ${k}`}
                     >
@@ -247,7 +320,7 @@ export function BindModal({
                           <span className="text-xs">{label}</span>
                           <button
                             type="button"
-                            onClick={() => onRemoveMIDIBind?.(b)}
+                            onClick={() => handleRemoveMIDIBind(b)}
                             className="p-0.5 rounded hover:bg-muted-foreground/20"
                             aria-label={`Remove ${label}`}
                           >
@@ -264,7 +337,7 @@ export function BindModal({
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={closeKeybindModal}>
             Done
           </Button>
         </DialogFooter>

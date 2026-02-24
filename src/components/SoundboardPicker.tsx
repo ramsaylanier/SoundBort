@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -19,19 +19,28 @@ import { Save, Trash2 } from 'lucide-react'
 import { getAllSoundboards, saveSoundboard, deleteSoundboard } from '@/utils/soundboardStorage'
 import { createEmptySoundboard } from '@/hooks/useSoundboard'
 import { STORAGE_KEYS } from '@/constants'
+import { useSoundboardStore } from '@/stores/useSoundboardStore'
+import { useAudioDeviceStore } from '@/stores/useAudioDeviceStore'
 import type { Soundboard } from '@/types'
 
 interface SoundboardPickerProps {
-  soundboard: Soundboard | null
   onLoad?: (board: Soundboard) => void
   onSave?: (board: Soundboard) => void
 }
 
 export function SoundboardPicker({
-  soundboard,
   onLoad,
   onSave,
 }: SoundboardPickerProps) {
+  const soundboardFromStore = useSoundboardStore((s) => s.soundboard)
+  const mixerLevels = useAudioDeviceStore((s) => s.mixerLevels)
+  const soundboard = useMemo(
+    () =>
+      soundboardFromStore
+        ? { ...soundboardFromStore, mixer: mixerLevels }
+        : null,
+    [soundboardFromStore, mixerLevels]
+  )
   const [savedBoards, setSavedBoards] = useState<Soundboard[]>([])
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
   const [saveName, setSaveName] = useState('')

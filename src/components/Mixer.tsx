@@ -17,8 +17,9 @@ import {
 import { LevelMeter } from '@/components/LevelMeter'
 import { SlidersHorizontal, Mic, MicOff, Speaker } from 'lucide-react'
 import { useAudioLevel } from '@/hooks/useAudioLevel'
-import { useAudioDeviceContext } from '@/contexts/AudioDeviceContext'
-import type { Sound, MixerLevels } from '@/types'
+import { useAudioDeviceStore } from '@/stores/useAudioDeviceStore'
+import { useSoundboardStore } from '@/stores/useSoundboardStore'
+import type { Sound } from '@/types'
 
 interface BusRowProps {
   label: string
@@ -46,37 +47,25 @@ const BusRow = ({ label, level, value, onValueChange }: BusRowProps) => {
   )
 }
 
-interface MixerProps {
-  mixerLevels: MixerLevels
-  setMixerLevels: React.Dispatch<React.SetStateAction<MixerLevels>>
-  sounds: (Sound | null)[] | undefined
-  setSoundVolume?: (soundId: string, volume: number) => void
-  onSoundVolumeChange?: (soundId: string, volume: number) => void
-  levelBySoundId?: Record<string, number>
-}
-
-export function Mixer({
-  mixerLevels,
-  setMixerLevels,
-  sounds,
-  setSoundVolume,
-  onSoundVolumeChange,
-  levelBySoundId = {},
-}: MixerProps) {
-  const audio = useAudioDeviceContext()
-  const {
-    analyserMicRef,
-    analyserSoundboardRef,
-    analyserMasterRef,
-    outputSelectSupported,
-    selectOutputDevice,
-    inputDevices = [],
-    selectedInputDeviceId,
-    setInputDevice,
-    micMuted,
-    setMicMuted,
-    error,
-  } = audio
+export function Mixer() {
+  const mixerLevels = useAudioDeviceStore((s) => s.mixerLevels)
+  const setMixerLevels = useAudioDeviceStore((s) => s.setMixerLevels)
+  const sounds = useSoundboardStore((s) => s.soundboard.sounds)
+  const setSoundVolume = useSoundboardStore((s) => s.setSoundVolume)
+  const updateSoundboard = useSoundboardStore((s) => s.updateSoundboard)
+  const currentSoundboard = useSoundboardStore((s) => s.soundboard)
+  const levelBySoundId = useSoundboardStore((s) => s.levelBySoundId)
+  const analyserMicRef = useAudioDeviceStore((s) => s.analyserMicRef)
+  const analyserSoundboardRef = useAudioDeviceStore((s) => s.analyserSoundboardRef)
+  const analyserMasterRef = useAudioDeviceStore((s) => s.analyserMasterRef)
+  const outputSelectSupported = useAudioDeviceStore((s) => s.outputSelectSupported)
+  const selectOutputDevice = useAudioDeviceStore((s) => s.selectOutputDevice)
+  const inputDevices = useAudioDeviceStore((s) => s.inputDevices)
+  const selectedInputDeviceId = useAudioDeviceStore((s) => s.selectedInputDeviceId)
+  const setInputDevice = useAudioDeviceStore((s) => s.setInputDevice)
+  const micMuted = useAudioDeviceStore((s) => s.micMuted)
+  const setMicMuted = useAudioDeviceStore((s) => s.setMicMuted)
+  const error = useAudioDeviceStore((s) => s.error)
 
   const micLevel = useAudioLevel(analyserMicRef)
   const soundboardLevel = useAudioLevel(analyserSoundboardRef)
@@ -187,8 +176,14 @@ export function Mixer({
                         value={[toSlider(s.volume ?? 1)]}
                         onValueChange={([v]) => {
                           const vol = fromSlider(v)
-                          setSoundVolume?.(s.id, vol)
-                          onSoundVolumeChange?.(s.id, vol)
+                          setSoundVolume(s.id, vol)
+                          if (currentSoundboard?.sounds) {
+                            updateSoundboard({
+                              sounds: currentSoundboard.sounds.map((cell) =>
+                                cell?.id === s.id ? { ...cell, volume: vol } : cell
+                              ),
+                            })
+                          }
                         }}
                         min={0}
                         max={100}

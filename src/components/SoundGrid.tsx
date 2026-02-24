@@ -1,35 +1,52 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import { SoundCell } from './SoundCell'
+import { useSoundboardStore } from '@/stores/useSoundboardStore'
+import { useSettingsStore } from '@/stores/useSettingsStore'
+import { useModalStore } from '@/stores/useModalStore'
+import { toast } from 'sonner'
 import type { Sound } from '@/types'
 
-interface SoundGridProps {
-  sounds: (Sound | null)[]
-  gridCols?: number
-  playingSoundId: string | null
-  keybindingsMap: Record<string, string[]>
-  levelBySoundId?: Record<string, number>
-  onPlay?: (sound: Sound) => void
-  onUpload?: (index: number, file: File) => void
-  onRecord?: (index: number) => void
-  onSetKeybind?: (index: number) => void
-  onEditClip?: (index: number) => void
-}
+const EMPTY_SOUNDS: (import('@/types').Sound | null)[] = []
 
-export function SoundGrid({
-  sounds,
-  gridCols = 4,
-  playingSoundId,
-  keybindingsMap,
-  levelBySoundId = {},
-  onPlay,
-  onUpload,
-  onRecord,
-  onSetKeybind,
-  onEditClip,
-}: SoundGridProps) {
-  const getKeybindings = useCallback(
-    (soundId: string) => keybindingsMap[soundId] ?? [],
-    [keybindingsMap]
+export function SoundGrid() {
+  const soundsFromStore = useSoundboardStore((s) => s.soundboard.sounds)
+  const sounds = useMemo(
+    () => soundsFromStore ?? EMPTY_SOUNDS,
+    [soundsFromStore]
+  )
+  const playingSoundId = useSoundboardStore((s) => s.playingSoundId)
+  const playSound = useSoundboardStore((s) => s.playSound)
+  const updateSound = useSoundboardStore((s) => s.updateSound)
+  const levelBySoundId = useSoundboardStore((s) => s.levelBySoundId)
+  const openRecordModal = useModalStore((s) => s.openRecordModal)
+  const openKeybindModal = useModalStore((s) => s.openKeybindModal)
+  const openClipEditModal = useModalStore((s) => s.openClipEditModal)
+  const gridCols = useSettingsStore((s) => s.gridCols)
+
+  const keybindingsMap = useMemo(() => {
+    const map: Record<string, string[]> = {}
+    sounds.forEach((s) => {
+      if (s?.keybindings?.length) map[s.id] = s.keybindings
+    })
+    return map
+  }, [sounds])
+
+  const handleUpload = useCallback(
+    (index: number, file: File) => {
+      const sound: Sound = {
+        id: crypto.randomUUID(),
+        name: file.name.replace(/\.[^/.]+$/, ''),
+        audioBlob: file,
+        keybindings: [],
+        midiBindings: [],
+        volume: 1,
+        startTime: 0,
+        endTime: null,
+      }
+      updateSound(index, sound)
+      toast.success(`Added "${sound.name}"`)
+    },
+    [updateSound]
   )
 
   return (
@@ -43,14 +60,14 @@ export function SoundGrid({
           sound={sound}
           index={index}
           isPlaying={sound?.id === playingSoundId}
-          keybindings={sound ? getKeybindings(sound.id) : []}
+          keybindings={sound ? (keybindingsMap[sound.id] ?? []) : []}
           midiBindings={sound?.midiBindings ?? []}
           level={sound ? (levelBySoundId[sound.id] ?? 0) : 0}
-          onPlay={onPlay}
-          onUpload={onUpload}
-          onRecord={onRecord}
-          onSetKeybind={onSetKeybind}
-          onEditClip={onEditClip}
+          onPlay={(s) => playSound(s, s.volume ?? 1)}
+          onUpload={handleUpload}
+          onRecord={openRecordModal}
+          onSetKeybind={openKeybindModal}
+          onEditClip={openClipEditModal}
         />
       ))}
     </div>

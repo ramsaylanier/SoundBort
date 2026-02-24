@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, useEffect } from 'react'
+import { useCallback, useMemo, useEffect } from 'react'
 import { Toaster } from '@/components/ui/sonner'
 import { getSoundboard } from '@/utils/soundboardStorage'
 import { STORAGE_KEYS, getStoredGridSize } from '@/constants'
@@ -10,57 +10,38 @@ import { BindModal } from '@/components/BindModal'
 import { RecordModal } from '@/components/RecordModal'
 import { ClipEditModal } from '@/components/ClipEditModal'
 import { SettingsModal } from '@/components/SettingsModal'
-import { useAudioDeviceContext } from '@/contexts/AudioDeviceContext'
-import { useSoundboard } from '@/hooks/useSoundboard'
+import { useAudioDeviceStore } from '@/stores/useAudioDeviceStore'
+import { useSoundboardStore } from '@/stores/useSoundboardStore'
+import { useModalStore } from '@/stores/useModalStore'
+import { useSettingsStore } from '@/stores/useSettingsStore'
 import { useKeyboardBindings } from '@/hooks/useKeyboardBindings'
 import { useMIDIAccess } from '@/hooks/useMIDIAccess'
 import { useMIDIBindings } from '@/hooks/useMIDIBindings'
 import { toast } from 'sonner'
-import { noteNumberToName, midiBindingsConflict } from '@/utils/midiUtils'
 import { Settings } from 'lucide-react'
 import type { Sound, Soundboard, MidiBinding } from '@/types'
 
 function App() {
-  const audio = useAudioDeviceContext()
-  const {
-    audioContext,
-    soundboardGainRef,
-    mixerLevels,
-    setMixerLevels,
-  } = audio
+  const error = useAudioDeviceStore((s) => s.error)
+  const setMixerLevels = useAudioDeviceStore((s) => s.setMixerLevels)
 
-  const soundboard = useSoundboard(audioContext, soundboardGainRef)
-  const {
-    soundboard: currentSoundboard,
-    updateSound,
-    updateSoundboard,
-    playSound,
-    playingSoundId,
-    setSoundVolume,
-    loadSoundboard,
-    levelBySoundId,
-  } = soundboard
+  const currentSoundboard = useSoundboardStore((s) => s.soundboard)
+  const playSound = useSoundboardStore((s) => s.playSound)
+  const loadSoundboard = useSoundboardStore((s) => s.loadSoundboard)
 
-  const [keybindModalCell, setKeybindModalCell] = useState<number | null>(null)
-  const [recordModalCell, setRecordModalCell] = useState<number | null>(null)
-  const [clipEditModalCell, setClipEditModalCell] = useState<number | null>(null)
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  const keybindModalCell = useModalStore((s) => s.keybindModalCell)
+  const openSettings = useModalStore((s) => s.openSettings)
 
-  const [gridState, setGridState] = useState(getStoredGridSize)
-  const { rows: gridRows, cols: gridCols } = gridState
-  const [midiEnabled, setMidiEnabled] = useState(
-    () => localStorage.getItem(STORAGE_KEYS.MIDI_ENABLED) === 'true'
-  )
-  const [defaultMidiDeviceId, setDefaultMidiDeviceId] = useState(
-    () => localStorage.getItem(STORAGE_KEYS.MIDI_DEFAULT_DEVICE_ID) ?? ''
-  )
+  const gridRows = useSettingsStore((s) => s.gridRows)
+  const gridCols = useSettingsStore((s) => s.gridCols)
+  const midiEnabled = useSettingsStore((s) => s.midiEnabled)
+  const defaultMidiDeviceId = useSettingsStore((s) => s.defaultMidiDeviceId)
 
   useEffect(() => {
-    if (audio.error) toast.error(audio.error)
-  }, [audio.error])
+    if (error) toast.error(error)
+  }, [error])
 
   const keybindingsMap = useMemo(() => {
-    console.log(currentSoundboard?.sounds)
     const map: Record<string, string[]> = {}
     currentSoundboard?.sounds?.forEach((s) => {
       if (s?.keybindings?.length) map[s.id] = s.keybindings
@@ -77,13 +58,6 @@ function App() {
   }, [currentSoundboard])
 
   const { midiAccess } = useMIDIAccess(midiEnabled)
-  const midiDevices = useMemo(() => {
-    if (!midiAccess?.inputs) return []
-    return Array.from(midiAccess.inputs.values()).map((input) => ({
-      id: input.id,
-      name: input.name || input.id,
-    }))
-  }, [midiAccess])
   const handleKeybindTrigger = useCallback(
     (soundId: string) => {
       const sound = currentSoundboard?.sounds?.find((s) => s?.id === soundId)
@@ -102,157 +76,6 @@ function App() {
     keybindModalCell != null
   )
 
-  const handleUpload = useCallback(
-    (index: number, file: File) => {
-      const sound: Sound = {
-        id: crypto.randomUUID(),
-        name: file.name.replace(/\.[^/.]+$/, ''),
-        audioBlob: file,
-        keybindings: [],
-        midiBindings: [],
-        volume: 1,
-        startTime: 0,
-        endTime: null,
-      }
-      updateSound(index, sound)
-      toast.success(`Added "${sound.name}"`)
-    },
-    [updateSound]
-  )
-
-  const handleRecordComplete = useCallback(
-    (index: number, blob: Blob, suggestedName: string) => {
-      const sound: Sound = {
-        id: crypto.randomUUID(),
-        name: suggestedName || `Recording ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
-        audioBlob: blob,
-        keybindings: [],
-        midiBindings: [],
-        volume: 1,
-        startTime: 0,
-        endTime: null,
-      }
-      updateSound(index, sound)
-      toast.success(`Added "${sound.name}"`)
-      setRecordModalCell(null)
-    },
-    [updateSound]
-  )
-
-  const handleSetKeybind = useCallback((index: number) => {
-    setKeybindModalCell(index)
-  }, [])
-
-  const handleKeybindSet = useCallback(
-    (keybind: string) => {
-      if (keybindModalCell == null) return
-      const sound = currentSoundboard?.sounds?.[keybindModalCell]
-      if (!sound) return
-      if (sound.keybindings?.includes(keybind)) {
-        toast.info('Key already bound to this sound')
-        return
-      }
-      const conflict = Object.entries(keybindingsMap).find(
-        ([id, bindings]) => id !== sound.id && bindings?.includes(keybind)
-      )
-      if (conflict) {
-        const [conflictSoundId] = conflict
-        const conflictSound = currentSoundboard?.sounds?.find((s) => s?.id === conflictSoundId)
-        toast.error(
-          `"${keybind}" is already bound to "${conflictSound?.name ?? 'another sound'}". Choose a different key.`
-        )
-        return
-      }
-      updateSound(keybindModalCell, { ...sound, keybindings: [keybind] })
-      toast.success(`Bound ${keybind}`)
-    },
-    [keybindModalCell, currentSoundboard, keybindingsMap, updateSound]
-  )
-
-  const handleRemoveKeybind = useCallback(
-    (keybind: string) => {
-      if (keybindModalCell == null) return
-      const sound = currentSoundboard?.sounds?.[keybindModalCell]
-      if (!sound) return
-      updateSound(keybindModalCell, { ...sound, keybindings: [] })
-      toast.success(`Removed ${keybind}`)
-    },
-    [keybindModalCell, currentSoundboard, updateSound]
-  )
-
-  const handleMIDIBindSet = useCallback(
-    (binding: MidiBinding) => {
-      if (keybindModalCell == null) return
-      const sound = currentSoundboard?.sounds?.[keybindModalCell]
-      if (!sound) return
-      const existing = sound.midiBindings ?? []
-      if (existing.some((b) => midiBindingsConflict(binding, b))) {
-        toast.info('MIDI note already bound to this sound')
-        return
-      }
-      const conflict = Object.entries(midiBindingsMap).find(
-        ([id, bindings]) =>
-          id !== sound.id &&
-          bindings?.some((b) => midiBindingsConflict(binding, b))
-      )
-      if (conflict) {
-        const [conflictSoundId] = conflict
-        const conflictSound = currentSoundboard?.sounds?.find((s) => s?.id === conflictSoundId)
-        toast.error(
-          `This note is already bound to "${conflictSound?.name ?? 'another sound'}". Choose a different note.`
-        )
-        return
-      }
-      updateSound(keybindModalCell, { ...sound, midiBindings: [binding] })
-      toast.success(`Bound ${noteNumberToName(binding.note)}`)
-    },
-    [keybindModalCell, currentSoundboard, midiBindingsMap, updateSound]
-  )
-
-  const handleRemoveMIDIBind = useCallback(
-    (binding: MidiBinding) => {
-      if (keybindModalCell == null) return
-      const sound = currentSoundboard?.sounds?.[keybindModalCell]
-      if (!sound) return
-      updateSound(keybindModalCell, { ...sound, midiBindings: [] })
-      toast.success(`Removed ${noteNumberToName(binding.note)}`)
-    },
-    [keybindModalCell, currentSoundboard, updateSound]
-  )
-
-  const handleEditClip = useCallback((index: number) => {
-    setClipEditModalCell(index)
-  }, [])
-
-  const handleClipEditSave = useCallback(
-    (startTime: number, endTime: number, name?: string) => {
-      if (clipEditModalCell == null) return
-      const sound = currentSoundboard?.sounds?.[clipEditModalCell]
-      if (!sound) return
-      updateSound(clipEditModalCell, {
-        ...sound,
-        startTime,
-        endTime,
-        ...(name != null && { name }),
-      })
-      toast.success('Clip updated')
-      setClipEditModalCell(null)
-    },
-    [clipEditModalCell, currentSoundboard, updateSound]
-  )
-
-  const handleSoundVolumeChange = useCallback(
-    (soundId: string, volume: number) => {
-      if (!currentSoundboard?.sounds) return
-      updateSoundboard({
-        sounds: currentSoundboard.sounds.map((s) =>
-          s?.id === soundId ? { ...s, volume } : s
-        ),
-      })
-    },
-    [currentSoundboard, updateSoundboard]
-  )
-
   const resizeSoundsToGrid = useCallback(
     (sounds: (Sound | null)[] | undefined, rows: number, cols: number): (Sound | null)[] => {
       const newSize = rows * cols
@@ -264,30 +87,11 @@ function App() {
     []
   )
 
-  const handleGridChange = useCallback(
-    (rows: number, cols: number) => {
-      setGridState({ rows, cols })
-      const newSize = rows * cols
-      const currentSounds = currentSoundboard?.sounds ?? []
-      let newSounds: (Sound | null)[]
-      if (currentSounds.length > newSize) {
-        newSounds = currentSounds.slice(0, newSize)
-      } else if (currentSounds.length < newSize) {
-        newSounds = [...currentSounds, ...Array(newSize - currentSounds.length).fill(null)]
-      } else {
-        return
-      }
-      updateSoundboard({ sounds: newSounds })
-    },
-    [currentSoundboard, updateSoundboard]
-  )
-
   const handleLoadSoundboard = useCallback(
     (board: Soundboard) => {
-      const { rows, cols } = gridState
       const resized = {
         ...board,
-        sounds: resizeSoundsToGrid(board?.sounds, rows, cols),
+        sounds: resizeSoundsToGrid(board?.sounds, gridRows, gridCols),
       }
       loadSoundboard(resized)
       if (board?.mixer) {
@@ -297,7 +101,7 @@ function App() {
         localStorage.setItem(STORAGE_KEYS.ACTIVE_SOUNDBOARD_ID, board.id)
       }
     },
-    [loadSoundboard, setMixerLevels, gridState, resizeSoundsToGrid]
+    [loadSoundboard, setMixerLevels, gridRows, gridCols, resizeSoundsToGrid]
   )
 
   useEffect(() => {
@@ -320,9 +124,6 @@ function App() {
     })
   }, [loadSoundboard, setMixerLevels])
 
-  const modalSound = keybindModalCell != null ? currentSoundboard?.sounds?.[keybindModalCell] ?? null : null
-  const clipEditSound = clipEditModalCell != null ? currentSoundboard?.sounds?.[clipEditModalCell] ?? null : null
-
   return (
     <div className="bg-background">
       <div className="h-[100vh] grid grid-cols-1 grid-rows-[auto_1fr] overflow-hidden">
@@ -332,94 +133,29 @@ function App() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setSettingsOpen(true)}
+              onClick={openSettings}
               title="Settings"
               aria-label="Settings"
             >
               <Settings className="size-5" />
             </Button>
           </div>
-          <SoundboardPicker
-            soundboard={
-              currentSoundboard
-                ? { ...currentSoundboard, mixer: mixerLevels }
-                : null
-            }
-            onLoad={handleLoadSoundboard}
-            onSave={() => { }}
-          />
-          <Mixer
-            mixerLevels={mixerLevels}
-            setMixerLevels={setMixerLevels}
-            sounds={currentSoundboard?.sounds}
-            setSoundVolume={setSoundVolume}
-            onSoundVolumeChange={handleSoundVolumeChange}
-            levelBySoundId={levelBySoundId}
-          />
+          <SoundboardPicker onLoad={handleLoadSoundboard} onSave={() => {}} />
+          <Mixer />
         </header>
 
         <main className="h-full overflow-hidden">
-          <SoundGrid
-            sounds={currentSoundboard?.sounds ?? []}
-            gridCols={gridCols}
-            playingSoundId={playingSoundId}
-            keybindingsMap={keybindingsMap}
-            levelBySoundId={levelBySoundId}
-            onPlay={(s) => playSound(s, s.volume ?? 1)}
-            onUpload={handleUpload}
-            onRecord={(index) => setRecordModalCell(index)}
-            onSetKeybind={handleSetKeybind}
-            onEditClip={handleEditClip}
-          />
+          <SoundGrid />
         </main>
       </div>
 
-      <BindModal
-        open={keybindModalCell != null}
-        onClose={() => setKeybindModalCell(null)}
-        soundName={modalSound?.name}
-        onKeybind={handleKeybindSet}
-        onRemoveKeybind={handleRemoveKeybind}
-        existingKeybinds={modalSound?.keybindings ?? []}
-        onMIDIBind={handleMIDIBindSet}
-        onRemoveMIDIBind={handleRemoveMIDIBind}
-        existingMIDIBinds={modalSound?.midiBindings ?? []}
-        midiEnabled={midiEnabled}
-        midiDevices={midiDevices}
-        defaultMidiDeviceId={defaultMidiDeviceId}
-        midiAccess={midiAccess}
-      />
+      <BindModal />
 
-      <ClipEditModal
-        open={clipEditModalCell != null}
-        onClose={() => setClipEditModalCell(null)}
-        sound={clipEditSound}
-        onSave={handleClipEditSave}
-      />
+      <ClipEditModal />
 
-      <SettingsModal
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        gridRows={gridRows}
-        gridCols={gridCols}
-        onGridChange={handleGridChange}
-        midiEnabled={midiEnabled}
-        onMidiEnabledChange={setMidiEnabled}
-        midiDevices={midiDevices}
-        defaultMidiDeviceId={defaultMidiDeviceId}
-        onDefaultMidiDeviceChange={(id) => {
-          setDefaultMidiDeviceId(id)
-          localStorage.setItem(STORAGE_KEYS.MIDI_DEFAULT_DEVICE_ID, id)
-        }}
-      />
+      <SettingsModal />
 
-      <RecordModal
-        open={recordModalCell != null}
-        onClose={() => setRecordModalCell(null)}
-        onRecordComplete={(blob, suggestedName) =>
-          recordModalCell != null && handleRecordComplete(recordModalCell, blob, suggestedName)
-        }
-      />
+      <RecordModal />
 
       <Toaster />
     </div>

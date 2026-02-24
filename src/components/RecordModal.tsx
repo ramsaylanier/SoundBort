@@ -10,7 +10,10 @@ import {
 import { Button } from '@/components/ui/button'
 import { Mic, Monitor, Square, Circle } from 'lucide-react'
 import { useAudioRecorder } from '@/hooks/useAudioRecorder'
-import { useAudioDeviceContext } from '@/contexts/AudioDeviceContext'
+import { useAudioDeviceStore } from '@/stores/useAudioDeviceStore'
+import { useModalStore } from '@/stores/useModalStore'
+import { useSoundboardStore } from '@/stores/useSoundboardStore'
+import { toast } from 'sonner'
 
 const TAB_CAPTURE_SUPPORTED = !!navigator.mediaDevices?.getDisplayMedia
 
@@ -20,19 +23,13 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-interface RecordModalProps {
-  open: boolean
-  onClose: () => void
-  onRecordComplete?: (blob: Blob, suggestedName: string) => void
-}
+export function RecordModal() {
+  const recordModalCell = useModalStore((s) => s.recordModalCell)
+  const closeRecordModal = useModalStore((s) => s.closeRecordModal)
+  const updateSound = useSoundboardStore((s) => s.updateSound)
+  const micStream = useAudioDeviceStore((s) => s.micStream)
 
-export function RecordModal({
-  open,
-  onClose,
-  onRecordComplete,
-}: RecordModalProps) {
-  const audio = useAudioDeviceContext()
-  const micStream = audio.micStream
+  const open = recordModalCell != null
 
   const [source, setSource] = useState<'mic' | 'tab'>('mic')
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
@@ -65,8 +62,8 @@ export function RecordModal({
     clearRecordedBlob()
     clearError()
     setSource('mic')
-    onClose?.()
-  }, [isRecording, stopRecording, clearRecordedBlob, clearError, onClose])
+    closeRecordModal()
+  }, [isRecording, stopRecording, clearRecordedBlob, clearError, closeRecordModal])
 
   const handleStartRecording = useCallback(async () => {
     clearError()
@@ -91,12 +88,23 @@ export function RecordModal({
   }, [source, micStream, startRecording, clearError, setError])
 
   const handleUseRecording = useCallback(() => {
-    if (recordedBlob) {
-      const name = `Recording ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-      onRecordComplete?.(recordedBlob, name)
+    if (recordedBlob && recordModalCell != null) {
+      const suggestedName = `Recording ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+      const sound = {
+        id: crypto.randomUUID(),
+        name: suggestedName,
+        audioBlob: recordedBlob,
+        keybindings: [],
+        midiBindings: [],
+        volume: 1,
+        startTime: 0,
+        endTime: null,
+      }
+      updateSound(recordModalCell, sound)
+      toast.success(`Added "${sound.name}"`)
     }
     handleClose()
-  }, [recordedBlob, onRecordComplete, handleClose])
+  }, [recordedBlob, recordModalCell, updateSound, handleClose])
 
   const handleDiscard = useCallback(() => {
     clearRecordedBlob()

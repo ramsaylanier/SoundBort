@@ -11,8 +11,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
 import { Play, Square } from 'lucide-react'
-import { useAudioDeviceContext } from '@/contexts/AudioDeviceContext'
-import type { Sound } from '@/types'
+import { useAudioDeviceStore } from '@/stores/useAudioDeviceStore'
+import { useModalStore } from '@/stores/useModalStore'
+import { useSoundboardStore } from '@/stores/useSoundboardStore'
+import { toast } from 'sonner'
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)
@@ -20,20 +22,16 @@ function formatTime(seconds: number): string {
   return `${m}:${s.padStart(2, '0')}`
 }
 
-interface ClipEditModalProps {
-  open: boolean
-  onClose: () => void
-  sound: Sound | null
-  onSave?: (_startTime: number, _endTime: number, _name?: string) => void
-}
+export function ClipEditModal() {
+  const clipEditModalCell = useModalStore((s) => s.clipEditModalCell)
+  const closeClipEditModal = useModalStore((s) => s.closeClipEditModal)
+  const soundboard = useSoundboardStore((s) => s.soundboard)
+  const updateSound = useSoundboardStore((s) => s.updateSound)
+  const audioContext = useAudioDeviceStore((s) => s.audioContext)
 
-export function ClipEditModal({
-  open,
-  onClose,
-  sound,
-  onSave,
-}: ClipEditModalProps) {
-  const { audioContext } = useAudioDeviceContext()
+  const open = clipEditModalCell != null
+  const sound = clipEditModalCell != null ? soundboard?.sounds?.[clipEditModalCell] ?? null : null
+
   const [duration, setDuration] = useState<number | null>(null)
   const [name, setName] = useState('')
   const [startTime, setStartTime] = useState(0)
@@ -87,13 +85,22 @@ export function ClipEditModal({
   }, [open])
 
   const handleSave = useCallback(() => {
-    if (duration == null) return
+    if (duration == null || clipEditModalCell == null) return
     const start = Math.max(0, Math.min(startTime, duration - 0.01))
     const end = Math.max(start + 0.01, Math.min(endTime ?? duration, duration))
     const trimmedName = (name ?? '').trim() || sound?.name || 'Untitled'
-    onSave?.(start, end, trimmedName || undefined)
-    onClose?.()
-  }, [duration, startTime, endTime, name, sound?.name, onSave, onClose])
+    const modalSound = soundboard?.sounds?.[clipEditModalCell]
+    if (modalSound) {
+      updateSound(clipEditModalCell, {
+        ...modalSound,
+        startTime: start,
+        endTime: end,
+        name: trimmedName,
+      })
+      toast.success('Clip updated')
+    }
+    closeClipEditModal()
+  }, [duration, startTime, endTime, name, sound?.name, clipEditModalCell, soundboard, updateSound, closeClipEditModal])
 
   const handleStartChange = useCallback(
     (v: string) => {
@@ -172,8 +179,8 @@ export function ClipEditModal({
   }, [audioContext, duration, startTime, endTime, isPlaying])
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose?.()}>
-      <DialogContent onPointerDownOutside={onClose}>
+    <Dialog open={open} onOpenChange={(o) => !o && closeClipEditModal()}>
+      <DialogContent key={sound?.id ?? 'no-sound'} onPointerDownOutside={closeClipEditModal}>
         <DialogHeader>
           <DialogTitle>Edit clip</DialogTitle>
           <DialogDescription>
@@ -275,7 +282,7 @@ export function ClipEditModal({
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={closeClipEditModal}>
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={!canSave}>

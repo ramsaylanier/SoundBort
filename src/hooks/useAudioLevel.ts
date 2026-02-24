@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 
 export function useAudioLevel(
-  analyserRef: React.RefObject<AnalyserNode | null>
+  analyser: AnalyserNode | null
 ): number {
   const [level, setLevel] = useState(0)
 
@@ -10,7 +10,7 @@ export function useAudioLevel(
     let dataArray: Uint8Array | null = null
 
     function tick() {
-      const node = analyserRef?.current
+      const node = analyser
       if (!node) {
         setLevel(0)
         rafId = requestAnimationFrame(tick)
@@ -32,7 +32,7 @@ export function useAudioLevel(
 
     rafId = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(rafId)
-  }, [analyserRef])
+  }, [analyser])
 
   return level
 }

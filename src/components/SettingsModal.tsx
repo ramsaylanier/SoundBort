@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState, useMemo } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -16,48 +16,40 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { STORAGE_KEYS, MIN_GRID, MAX_GRID, getStoredGridSize } from '@/constants'
+import { MIN_GRID, MAX_GRID, getStoredGridSize } from '@/constants'
 import { cn } from '@/lib/utils'
+import { useModalStore } from '@/stores/useModalStore'
+import { useSettingsStore } from '@/stores/useSettingsStore'
+import { useSoundboardStore } from '@/stores/useSoundboardStore'
+import { useMIDIAccess } from '@/hooks/useMIDIAccess'
 
 const midiSupported = typeof navigator !== 'undefined' && !!navigator.requestMIDIAccess
 
-interface SettingsModalProps {
-  open: boolean
-  onClose: () => void
-  gridRows: number
-  gridCols: number
-  onGridChange: (rows: number, cols: number) => void
-  midiEnabled: boolean
-  onMidiEnabledChange: (enabled: boolean) => void
-  midiDevices?: { id: string; name: string }[]
-  defaultMidiDeviceId?: string
-  onDefaultMidiDeviceChange?: (deviceId: string) => void
-}
+export function SettingsModal() {
+  const settingsOpen = useModalStore((s) => s.settingsOpen)
+  const closeSettings = useModalStore((s) => s.closeSettings)
+  const gridRows = useSettingsStore((s) => s.gridRows)
+  const gridCols = useSettingsStore((s) => s.gridCols)
+  const setGrid = useSettingsStore((s) => s.setGrid)
+  const midiEnabled = useSettingsStore((s) => s.midiEnabled)
+  const setMidiEnabled = useSettingsStore((s) => s.setMidiEnabled)
+  const defaultMidiDeviceId = useSettingsStore((s) => s.defaultMidiDeviceId)
+  const setDefaultMidiDeviceId = useSettingsStore((s) => s.setDefaultMidiDeviceId)
+  const soundboard = useSoundboardStore((s) => s.soundboard)
+  const updateSoundboard = useSoundboardStore((s) => s.updateSoundboard)
 
-export function SettingsModal({
-  open,
-  onClose,
-  gridRows,
-  gridCols,
-  onGridChange,
-  midiEnabled,
-  onMidiEnabledChange,
-  midiDevices = [],
-  defaultMidiDeviceId = '',
-  onDefaultMidiDeviceChange,
-}: SettingsModalProps) {
+  const { midiAccess } = useMIDIAccess(midiEnabled)
+  const midiDevices = useMemo(() => {
+    if (!midiAccess?.inputs) return []
+    return Array.from(midiAccess.inputs.values()).map((input) => ({
+      id: input.id,
+      name: input.name || input.id,
+    }))
+  }, [midiAccess])
+
   const [localRows, setLocalRows] = useState(() => gridRows ?? getStoredGridSize().rows)
   const [localCols, setLocalCols] = useState(() => gridCols ?? getStoredGridSize().cols)
   const [midiError, setMidiError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (open) {
-      queueMicrotask(() => {
-        setLocalRows(gridRows ?? getStoredGridSize().rows)
-        setLocalCols(gridCols ?? getStoredGridSize().cols)
-      })
-    }
-  }, [open, gridRows, gridCols])
 
   const handleMidiToggle = useCallback(async () => {
     if (!midiSupported) return
@@ -66,17 +58,15 @@ export function SettingsModal({
       try {
         await navigator.requestMIDIAccess()
         setMidiError(null)
-        onMidiEnabledChange?.(true)
-        localStorage.setItem(STORAGE_KEYS.MIDI_ENABLED, 'true')
+        setMidiEnabled(true)
       } catch (err) {
         setMidiError((err as Error).message ?? 'Failed to access MIDI')
       }
     } else {
-      onMidiEnabledChange?.(false)
-      localStorage.setItem(STORAGE_KEYS.MIDI_ENABLED, 'false')
+      setMidiEnabled(false)
       setMidiError(null)
     }
-  }, [midiEnabled, onMidiEnabledChange])
+  }, [midiEnabled, setMidiEnabled])
 
   const applyGrid = useCallback(
     (rows: number, cols: number) => {
@@ -84,11 +74,20 @@ export function SettingsModal({
       const c = Math.min(MAX_GRID, Math.max(MIN_GRID, cols))
       setLocalRows(r)
       setLocalCols(c)
-      localStorage.setItem(STORAGE_KEYS.GRID_ROWS, String(r))
-      localStorage.setItem(STORAGE_KEYS.GRID_COLS, String(c))
-      onGridChange?.(r, c)
+      setGrid(r, c)
+      const newSize = r * c
+      const currentSounds = soundboard?.sounds ?? []
+      let newSounds: (typeof currentSounds)[number][]
+      if (currentSounds.length > newSize) {
+        newSounds = currentSounds.slice(0, newSize)
+      } else if (currentSounds.length < newSize) {
+        newSounds = [...currentSounds, ...Array(newSize - currentSounds.length).fill(null)]
+      } else {
+        return
+      }
+      updateSoundboard({ sounds: newSounds })
     },
-    [onGridChange]
+    [setGrid, soundboard, updateSoundboard]
   )
 
   const handleRowsBlur = useCallback(() => {
@@ -100,8 +99,8 @@ export function SettingsModal({
   }, [localRows, localCols, applyGrid])
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose?.()}>
-      <DialogContent onPointerDownOutside={onClose}>
+    <Dialog open={settingsOpen} onOpenChange={(o) => !o && closeSettings()}>
+      <DialogContent key={settingsOpen ? 'open' : 'closed'} onPointerDownOutside={closeSettings}>
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>Configure MIDI and grid layout.</DialogDescription>
@@ -149,7 +148,7 @@ export function SettingsModal({
                 </label>
                 <Select
                   value={defaultMidiDeviceId || 'all'}
-                  onValueChange={(v) => onDefaultMidiDeviceChange?.(v === 'all' ? '' : v)}
+                  onValueChange={(v) => setDefaultMidiDeviceId(v === 'all' ? '' : v)}
                 >
                   <SelectTrigger id="default-midi-device" className="w-full">
                     <SelectValue placeholder="Select device" />
@@ -212,7 +211,7 @@ export function SettingsModal({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={closeSettings}>
             Done
           </Button>
         </DialogFooter>
