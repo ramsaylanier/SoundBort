@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useEffect } from 'react'
+import { useCallback, useMemo, useEffect, useState } from 'react'
 import { Toaster } from '@/components/ui/sonner'
-import { getSoundboard } from '@/utils/soundboardStorage'
+import { getAllSoundboards } from '@/utils/soundboardStorage'
 import { STORAGE_KEYS, getStoredGridSize } from '@/constants'
+import { createEmptySoundboard } from '@/hooks/useSoundboard'
 import { Button } from '@/components/ui/button'
 import { Mixer } from '@/components/Mixer'
 import { SoundboardPicker } from '@/components/SoundboardPicker'
@@ -22,6 +23,7 @@ import { Settings } from 'lucide-react'
 import type { Sound, Soundboard, MidiBinding } from '@/types'
 
 function App() {
+  const [isReady, setIsReady] = useState(false)
   const error = useAudioDeviceStore((s) => s.error)
   const setMixerLevels = useAudioDeviceStore((s) => s.setMixerLevels)
 
@@ -105,24 +107,36 @@ function App() {
   )
 
   useEffect(() => {
-    const activeId = localStorage.getItem(STORAGE_KEYS.ACTIVE_SOUNDBOARD_ID)
-    if (!activeId) return
-    getSoundboard(activeId).then((board) => {
-      if (!board) return
-      const { rows, cols } = getStoredGridSize()
-      const newSize = rows * cols
-      const sounds = board.sounds ?? []
-      const resized =
-        sounds.length > newSize
-          ? sounds.slice(0, newSize)
-          : sounds.length < newSize
-            ? [...sounds, ...Array(newSize - sounds.length).fill(null)]
-            : sounds
-      loadSoundboard({ ...board, sounds: resized })
-      if (board.mixer) setMixerLevels((prev) => ({ ...prev, ...board.mixer }))
-      localStorage.setItem(STORAGE_KEYS.ACTIVE_SOUNDBOARD_ID, board.id)
+    const { rows, cols } = getStoredGridSize()
+    const newSize = rows * cols
+    const resize = (sounds: (Sound | null)[] | undefined) => {
+      const s = sounds ?? []
+      return s.length > newSize ? s.slice(0, newSize) : s.length < newSize ? [...s, ...Array(newSize - s.length).fill(null)] : s
+    }
+
+    getAllSoundboards().then((savedBoards) => {
+      const activeId = localStorage.getItem(STORAGE_KEYS.ACTIVE_SOUNDBOARD_ID)
+      if (savedBoards.length > 0) {
+        const board = savedBoards.find((b) => b.id === activeId) ?? savedBoards[0]!
+        const resized = { ...board, sounds: resize(board.sounds) }
+        loadSoundboard(resized)
+        if (board.mixer) setMixerLevels((prev) => ({ ...prev, ...board.mixer }))
+        localStorage.setItem(STORAGE_KEYS.ACTIVE_SOUNDBOARD_ID, board.id)
+      } else {
+        const board = createEmptySoundboard()
+        loadSoundboard(board)
+      }
+      setIsReady(true)
     })
   }, [loadSoundboard, setMixerLevels])
+
+  if (!isReady) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <p className="text-muted-foreground">Loading soundboards…</p>
+      </div>
+    )
+  }
 
   return (
     <div className="bg-background">
@@ -140,7 +154,7 @@ function App() {
               <Settings className="size-5" />
             </Button>
           </div>
-          <SoundboardPicker onLoad={handleLoadSoundboard} onSave={() => {}} />
+          <SoundboardPicker onLoad={handleLoadSoundboard} />
           <Mixer />
         </header>
 

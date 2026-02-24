@@ -15,7 +15,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Save, Trash2 } from 'lucide-react'
+import { Plus, Save, Trash2 } from 'lucide-react'
 import { getAllSoundboards, saveSoundboard, deleteSoundboard } from '@/utils/soundboardStorage'
 import { createEmptySoundboard } from '@/hooks/useSoundboard'
 import { STORAGE_KEYS } from '@/constants'
@@ -25,12 +25,10 @@ import type { Soundboard } from '@/types'
 
 interface SoundboardPickerProps {
   onLoad?: (board: Soundboard) => void
-  onSave?: (board: Soundboard) => void
 }
 
 export function SoundboardPicker({
   onLoad,
-  onSave,
 }: SoundboardPickerProps) {
   const soundboardFromStore = useSoundboardStore((s) => s.soundboard)
   const mixerLevels = useAudioDeviceStore((s) => s.mixerLevels)
@@ -46,18 +44,25 @@ export function SoundboardPicker({
   const [saveName, setSaveName] = useState('')
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [isCreatingNew, setIsCreatingNew] = useState(false)
-
   useEffect(() => {
     getAllSoundboards().then(setSavedBoards)
   }, [soundboard])
 
   const handleCreateNew = () => {
-    const newBoard = createEmptySoundboard()
-    onLoad?.(newBoard)
+    setIsCreatingNew(true)
+    setSaveName('New Soundboard')
+    setSaveDialogOpen(true)
   }
 
+  const boardsForSelect = useMemo(() => {
+    if (!soundboard?.id) return savedBoards
+    const inSaved = savedBoards.some((b) => b.id === soundboard.id)
+    if (inSaved) return savedBoards
+    return [soundboard, ...savedBoards]
+  }, [soundboard, savedBoards])
+
   const handleLoad = (id: string) => {
-    const board = savedBoards.find((b) => b.id === id)
+    const board = savedBoards.find((b) => b.id === id) ?? (id === soundboard?.id ? soundboard : null)
     if (board) onLoad?.(board)
   }
 
@@ -67,9 +72,24 @@ export function SoundboardPicker({
     setSaveDialogOpen(true)
   }
 
+  const trimmedName = saveName?.trim() ?? ''
+  const isNameValid = trimmedName.length > 0
+  const isNameUnique = useMemo(() => {
+    if (!isNameValid) return true
+    const lower = trimmedName.toLowerCase()
+    if (isCreatingNew) {
+      return !savedBoards.some((b) => b.name.trim().toLowerCase() === lower)
+    }
+    return !savedBoards.some(
+      (b) => b.id !== soundboard?.id && b.name.trim().toLowerCase() === lower
+    )
+  }, [trimmedName, isNameValid, isCreatingNew, savedBoards, soundboard?.id])
+
+  const canSave = isNameValid && isNameUnique
+
   const handleSaveConfirm = async () => {
-    const name = saveName?.trim() || (isCreatingNew ? 'New Soundboard' : soundboard?.name)
-    if (!name) return
+    const name = trimmedName || (isCreatingNew ? 'New Soundboard' : soundboard?.name)
+    if (!name || !canSave) return
 
     if (isCreatingNew) {
       const newBoard = createEmptySoundboard(name)
@@ -79,7 +99,6 @@ export function SoundboardPicker({
       setSaveDialogOpen(false)
       setIsCreatingNew(false)
       onLoad?.(newBoard)
-      onSave?.(newBoard)
     } else {
       if (!soundboard) return
       const toSave = { ...soundboard, name }
@@ -93,12 +112,11 @@ export function SoundboardPicker({
         return next
       })
       setSaveDialogOpen(false)
-      onSave?.(toSave)
     }
   }
 
   const selectValue =
-    soundboard?.id && savedBoards.some((b) => b.id === soundboard.id)
+    soundboard?.id && boardsForSelect.some((b) => b.id === soundboard.id)
       ? soundboard.id
       : ''
 
@@ -138,7 +156,7 @@ export function SoundboardPicker({
             <SelectValue placeholder="Load soundboard" />
           </SelectTrigger>
           <SelectContent>
-            {savedBoards.map((b) => (
+            {boardsForSelect.map((b) => (
               <SelectItem key={b.id} value={b.id}>
                 {b.name}
               </SelectItem>
@@ -146,6 +164,7 @@ export function SoundboardPicker({
           </SelectContent>
         </Select>
       </div>
+
       <Button
         variant="outline"
         size="sm"
@@ -155,6 +174,16 @@ export function SoundboardPicker({
       >
         <Save className="size-4" />
         Save
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleCreateNew}
+        className="gap-2"
+        title="Create new soundboard"
+      >
+        <Plus className="size-4" />
+        New
       </Button>
       <Button
         variant="outline"
@@ -181,16 +210,27 @@ export function SoundboardPicker({
               {isCreatingNew ? 'New soundboard' : 'Save soundboard'}
             </DialogTitle>
           </DialogHeader>
-          <Input
-            value={saveName}
-            onChange={(e) => setSaveName(e.target.value)}
-            placeholder="Soundboard name"
-          />
+          <div className="space-y-1">
+            <Input
+              value={saveName}
+              onChange={(e) => setSaveName(e.target.value)}
+              placeholder="Soundboard name"
+              aria-invalid={!isNameValid || !isNameUnique}
+            />
+            {!isNameValid && (
+              <p className="text-sm text-destructive">Name is required</p>
+            )}
+            {isNameValid && !isNameUnique && (
+              <p className="text-sm text-destructive">A soundboard with this name already exists</p>
+            )}
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveConfirm}>Save</Button>
+            <Button onClick={handleSaveConfirm} disabled={!canSave}>
+              Save
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

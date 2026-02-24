@@ -87,7 +87,7 @@ export function SoundCell({
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
-      <CardContent className="p-3 flex flex-col h-full justify-between">
+      <CardContent className="flex flex-col h-full justify-between">
         <input
           ref={inputRef}
           type="file"
@@ -179,8 +179,7 @@ export function SoundCell({
             </div>
           </>
         ) : (
-          <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground py-4">
-            <Plus className="size-8" />
+          <div className="flex flex-col items-center justify-center text-muted-foreground h-full gap-4">
             <span className="text-xs">Click or drop audio</span>
             {onRecord && (
               <Button
