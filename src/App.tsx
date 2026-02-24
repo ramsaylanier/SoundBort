@@ -11,6 +11,7 @@ import { BindModal } from '@/components/BindModal'
 import { RecordModal } from '@/components/RecordModal'
 import { ClipEditModal } from '@/components/ClipEditModal'
 import { SettingsModal } from '@/components/SettingsModal'
+import { UnlockAudioModal } from '@/components/UnlockAudioModal'
 import { useAudioDeviceStore } from '@/stores/useAudioDeviceStore'
 import { useSoundboardStore } from '@/stores/useSoundboardStore'
 import { useModalStore } from '@/stores/useModalStore'
@@ -170,6 +171,8 @@ function App() {
       <SettingsModal />
 
       <RecordModal />
+
+      <UnlockAudioModal />
 
       <Toaster />
     </div>

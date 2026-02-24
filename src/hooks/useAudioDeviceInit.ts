@@ -9,8 +9,6 @@ export function useAudioDeviceInit() {
   const selectedInputDeviceId = useAudioDeviceStore((s) => s.selectedInputDeviceId)
   const selectedOutputDeviceId = useAudioDeviceStore((s) => s.selectedOutputDeviceId)
   const mixerLevels = useAudioDeviceStore((s) => s.mixerLevels)
-  const micMuted = useAudioDeviceStore((s) => s.micMuted)
-  const isRecording = useAudioDeviceStore((s) => s.isRecording)
   const setMicStream = useAudioDeviceStore((s) => s.setMicStream)
   const setOutputDevice = useAudioDeviceStore((s) => s.setOutputDevice)
   const setSelectedOutputDeviceId = useAudioDeviceStore((s) => s.setSelectedOutputDeviceId)
@@ -71,6 +69,7 @@ export function useAudioDeviceInit() {
     const resumeOnInteraction = async () => {
       if (ctx.state === 'suspended') {
         await ctx.resume()
+        useAudioDeviceStore.getState().setUnlockModalDismissed(true)
       }
       for (const ev of ['click', 'keydown', 'touchstart'] as const) {
         document.removeEventListener(ev, resumeOnInteraction)
@@ -181,11 +180,11 @@ export function useAudioDeviceInit() {
 
   // Consolidated gain sync (Phase 4 cleanup - single effect)
   // Web Audio GainNode.gain.value is intentionally mutable - we sync store state to the audio graph
-  // Mic output only audible during recording; otherwise muted to avoid unwanted monitoring
+  // Mic is never routed to output (causes feedback/phase issues during recording)
   useEffect(() => {
     /* eslint-disable react-hooks/immutability -- GainNode.gain.value is a Web Audio API mutable property */
     if (micGainRef) {
-      micGainRef.gain.value = isRecording && !micMuted ? mixerLevels.mic : 0
+      micGainRef.gain.value = 0
     }
     if (soundboardGainRef) {
       soundboardGainRef.gain.value = mixerLevels.soundboard
@@ -194,5 +193,5 @@ export function useAudioDeviceInit() {
       masterGainRef.gain.value = mixerLevels.master
     }
     /* eslint-enable react-hooks/immutability */
-  }, [micGainRef, soundboardGainRef, masterGainRef, micMuted, mixerLevels, isRecording])
+  }, [micGainRef, soundboardGainRef, masterGainRef, mixerLevels])
 }

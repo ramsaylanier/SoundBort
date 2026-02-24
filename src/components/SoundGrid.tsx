@@ -1,5 +1,13 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { SoundCell } from './SoundCell'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 import { useSoundboardStore } from '@/stores/useSoundboardStore'
 import { useSettingsStore } from '@/stores/useSettingsStore'
 import { useModalStore } from '@/stores/useModalStore'
@@ -22,6 +30,7 @@ export function SoundGrid() {
   const openKeybindModal = useModalStore((s) => s.openKeybindModal)
   const openClipEditModal = useModalStore((s) => s.openClipEditModal)
   const gridCols = useSettingsStore((s) => s.gridCols)
+  const [removeDialogIndex, setRemoveDialogIndex] = useState<number | null>(null)
 
   const keybindingsMap = useMemo(() => {
     const map: Record<string, string[]> = {}
@@ -30,6 +39,19 @@ export function SoundGrid() {
     })
     return map
   }, [sounds])
+
+  const handleRemoveClick = useCallback((index: number) => {
+    setRemoveDialogIndex(index)
+  }, [])
+
+  const handleRemoveConfirm = useCallback(() => {
+    if (removeDialogIndex === null) return
+    updateSound(removeDialogIndex, null)
+    setRemoveDialogIndex(null)
+    toast.success('Clip removed')
+  }, [removeDialogIndex, updateSound])
+
+  const pendingRemoveSound = removeDialogIndex !== null ? sounds[removeDialogIndex] ?? null : null
 
   const handleUpload = useCallback(
     (index: number, file: File) => {
@@ -68,8 +90,28 @@ export function SoundGrid() {
           onRecord={openRecordModal}
           onSetKeybind={openKeybindModal}
           onEditClip={openClipEditModal}
+          onRemove={handleRemoveClick}
         />
       ))}
+
+      <Dialog open={removeDialogIndex !== null} onOpenChange={(open) => !open && setRemoveDialogIndex(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove clip</DialogTitle>
+          </DialogHeader>
+          <p className="text-muted-foreground">
+            Are you sure you want to remove &quot;{pendingRemoveSound?.name ?? 'this clip'}&quot;? This cannot be undone.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRemoveDialogIndex(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleRemoveConfirm}>
+              Remove
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

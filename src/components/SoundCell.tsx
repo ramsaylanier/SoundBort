@@ -2,7 +2,7 @@ import { useRef, useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { LevelMeter } from '@/components/LevelMeter'
-import { Volume2, Plus, Mic, Scissors, Keyboard } from 'lucide-react'
+import { Volume2, Mic, Scissors, Keyboard, Trash2 } from 'lucide-react'
 import { noteNumberToName } from '@/utils/midiUtils'
 import { cn } from '@/lib/utils'
 import { ACCEPTED_AUDIO_FORMATS, MAX_SOUND_FILE_SIZE_BYTES } from '@/constants'
@@ -20,6 +20,7 @@ interface SoundCellProps {
   onRecord?: (index: number) => void
   onSetKeybind?: (index: number) => void
   onEditClip?: (index: number) => void
+  onRemove?: (index: number) => void
 }
 
 export function SoundCell({
@@ -34,6 +35,7 @@ export function SoundCell({
   onRecord,
   onSetKeybind,
   onEditClip,
+  onRemove,
 }: SoundCellProps) {
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -129,14 +131,16 @@ export function SoundCell({
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-6"
+                className="size-6 text-muted-foreground hover:text-destructive"
                 onClick={(e) => {
                   e.stopPropagation()
-                  onPlay?.(sound)
+                  onRemove?.(index)
                 }}
+                title="Remove clip"
               >
-                <Volume2 className="size-3" />
+                <Trash2 className="size-3" />
               </Button>
+
             </div>
             <div className="text-xs text-muted-foreground flex flex-wrap gap-1">
               {keybindings.map((k) => (
